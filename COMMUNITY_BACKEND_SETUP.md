@@ -142,17 +142,41 @@ same origin and rely on "it's a different file" or "it's a different
 storage key" to keep a Mod away from an authenticated session — it will
 not.
 
-**On `file://` isolation for local testing**: this milestone's live
-testing was conducted by opening `index.html` and `community.html` as
-two separate `file://` tabs, and in the browser used for that testing
-each `file://` URL was isolated as its own origin. This is convenient
-for local development but is a **browser-implementation detail, not a
-guaranteed or standardized isolation mechanism** — different browsers
-and configurations have historically treated `file://` origin isolation
-differently. Do not treat `file://` opening as a substitute for real
-origin separation in any deployment that isn't purely local, single-user
-testing; use the `community.example.com`/`play.example.com`-style split
-above for anything real.
+**On `file://` isolation for local testing — CORRECTED, with a concrete
+finding**: an earlier draft of this document speculated that opening
+`index.html` and `community.html` as two separate `file://` tabs gives
+each one its own isolated origin. **This was checked empirically during
+the Community Discovery milestone and found to be false in the actual
+test environment used**: `location.origin` for both files evaluated to
+the literal string `"file://"` (not a per-file or per-directory unique
+value), and `community.html`'s live session — including a real, valid
+`access_token`/`refresh_token` — was directly readable from
+`index.html`'s `localStorage` via `localStorage.getItem
+('voxelcraft.community.portal.session.v1')`. Verified live: after
+signing in on `community.html`, opening `index.html` (a separate file in
+the same directory, via `file://`) and reading its own `localStorage`
+returned the full session object, token included.
+
+This is **not** a vulnerability in `index.html`'s own code — it never
+reads or references that key anywhere (verified by inspection: the
+Runtime only ever touches its own `voxel-runtime.locale` key and Mod-
+namespaced `api.storage` keys). But because Mods execute as trusted,
+same-realm JavaScript with no sandbox, a malicious Mod loaded into a
+`file://`-opened Runtime that shares an origin with the Portal **could**
+read this key directly and obtain a live Community session. This is
+exactly the attack the origin-separation requirement (§ 6 above) exists
+to prevent, and this test proves the requirement is load-bearing, not
+theoretical: **local `file://` testing does not, by itself, demonstrate
+or provide the required isolation, even when the two files live in
+different paths.** Do not treat opening the two files via `file://` as
+equivalent to, or evidence of, real origin separation. For local
+development that actually needs to verify the isolation boundary, serve
+the two files from two different `localhost` ports (e.g. two separate
+`python -m http.server` instances) rather than opening them via
+`file://`, and confirm `location.origin` differs between them before
+trusting the setup. For anything beyond purely local, single-user
+testing, use the `community.example.com`/`play.example.com`-style split
+above — it is the only configuration this document treats as verified-safe.
 
 ## 7. Row Level Security is not optional
 

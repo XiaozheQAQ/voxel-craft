@@ -1051,3 +1051,32 @@ here is `api.*`. `RUNTIME_VERSION` remains `0.2.0-dev` -- this milestone
 is not a stable 0.2 release. Full design, schema, RLS matrix, and
 acceptance-test results:
 `COMMUNITY_BACKEND_SPEC.md` / `COMMUNITY_BACKEND_SETUP.md`.
+
+013 (Runtime 0.2, Community Discovery & Release Pages): turned the
+backend into a usable, anonymous-first discovery experience --
+Explore (search/filters/keyset pagination, `published_at DESC` only),
+a public Release detail page, and a public profile page, all inside
+`community.html`. One new `security_invoker` read-model view
+(`community_release_cards`) avoids N+1 card queries; `index.html` gained
+exactly one new hook (`?communityRelease=<uuid>` auto-preview, never
+auto-execute) as the Portal's Runtime-handoff receiving end. Two real
+bugs found and fixed live: an expired session token was silently
+breaking anonymous Explore (fixed via an explicit `anon:true` flag that
+never attaches a token regardless of session state), and `showMsg()`
+misuse was clearing an entire composed page section instead of just an
+inline status line (fixed with new non-destructive `appendMsg()`/
+`toast()` helpers). A third bug -- unencoded search-term characters
+(e.g. `100% off`) breaking `fetch()` outright -- was found during the
+mandated search-input attack-string testing and fixed by percent-encoding
+the ILIKE value. A live no-token-leak test produced a corrected,
+previously-unverified finding rather than a clean pass: `file://`-opening
+`index.html`/`community.html` from the same directory shares one origin
+in the tested environment (`location.origin` was `"file://"` for both),
+making the Portal's session token physically readable from the Runtime's
+`localStorage` -- proof, not just assertion, that the origin-separation
+requirement is load-bearing. No schema field changed on any existing
+table; no Workspace/Release Format field changed. `API_VERSION`/
+`VMP_VERSION`/`GAME_PACKAGE_FORMAT_VERSION`/`WORKSPACE_FORMAT_VERSION`/
+`COMMUNITY_RELEASE_FORMAT_VERSION` all remain unchanged. `RUNTIME_VERSION`
+remains `0.2.0-dev`. Full design, query contract, and acceptance-test
+results: `COMMUNITY_DISCOVERY_SPEC.md`.

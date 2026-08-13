@@ -336,3 +336,18 @@ Runtime's *only* new UI surface this milestone — everything else
 (Auth, publish, manage releases) lives in the separate `community.html`
 Portal, never in the Workshop. Full design:
 `COMMUNITY_BACKEND_SPEC.md`.
+
+## Runtime 0.2 — Community Discovery handoff UX
+
+The "Open Community Release (remote)" field above now has a second entry
+point: opening `index.html` itself with `?communityRelease=<uuid>` in
+the URL. This is how `community.html`'s Explore/Release-detail
+"Open in Runtime"/"Remix" buttons hand a Release off to the Runtime. On
+load, the Workshop auto-opens to the Export tab and the id field is
+pre-filled and auto-fetched — the player sees the exact same preview
+card / trust notice / `[Cancel]`/`[Open Release]` confirmation as a
+manual fetch, with zero Mods active until they explicitly click "Open
+Release." No new Community Portal UI was added to the Workshop itself —
+the Portal (browsing, search, filters, Release/profile pages) is a
+separate application entirely; this Runtime only ever receives a bare
+Release id. Full design: `COMMUNITY_DISCOVERY_SPEC.md`.

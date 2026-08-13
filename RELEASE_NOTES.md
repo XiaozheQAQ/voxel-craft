@@ -9,6 +9,45 @@ Voxel Creation Workspace Format 1 — one additive field
 Voxel Community Release Format 1 — one additive field
 ```
 
+## Runtime 0.2.0-dev — Community Discovery & Release Pages
+
+Community is now browsable and shareable without signing in: an Explore
+page, search, language/tag filters, a public Release detail page, and a
+public creator profile page — all inside `community.html`.
+
+- **Explore** (`community.html`'s new default landing page): the latest
+  published Releases, newest first, with a search box (title/
+  description/author, case-insensitive substring — verified live with a
+  real `zh-CN` search for "水晶") and language/tag filters that persist in
+  the URL (`?q=&lang=&tag=`) so a filtered view is shareable and survives
+  a page refresh. "Load more" fetches the next page via keyset
+  pagination (20 per page) — verified live with zero duplicate/missing
+  rows across multiple pages.
+- **Release detail page** (`community.html?release=<uuid>`): title,
+  description, author (linked to their public profile), tags, language,
+  release note, an honest **Compatibility** label (never a safety
+  rating), parent/remix attribution (or "Original release unavailable"
+  if the parent has been withdrawn — the page never breaks), direct
+  Remixes, a read-only Mods list (never executed), Download, Open in
+  Runtime, Remix, and Copy Link.
+- **Public profile page** (`community.html?profile=<uuid>`): display
+  name, bio, avatar, join date, and that creator's currently-published
+  Releases only — a withdrawn Release never appears here, even to its
+  own owner (owners see it under "My Releases" instead).
+- **Runtime handoff**: "Open in Runtime"/"Remix" open `index.html` with
+  only a Release id in the URL (`?communityRelease=<uuid>`) — never a
+  token. The Runtime auto-previews that Release (same trust-notice/
+  Cancel/Open pipeline as any other Open Release path) but never
+  auto-executes its Mods; opening still requires an explicit click.
+- Full English + Simplified Chinese support, including hostile-content
+  safety (`<img onerror>`, `<svg onload>`, and similar payloads verified
+  live to render as inert text everywhere — cards, search results, the
+  detail page, even the browser tab title).
+- See `COMMUNITY_DISCOVERY_SPEC.md` for the complete design, query
+  contract, and acceptance-test results — including a corrected finding
+  about `file://`-based local testing not actually proving the Runtime/
+  Portal origin-separation security boundary.
+
 ## Runtime 0.2.0-dev — Community Backend Foundation
 
 Not yet declared stable — `RUNTIME_VERSION` remains `0.2.0-dev` for this
@@ -302,6 +341,8 @@ the same as you would any other executable.
 - `COMMUNITY_BACKEND_SPEC.md` / `COMMUNITY_BACKEND_SETUP.md` — the
   Supabase-backed Community backend: schema, RLS, the Community Portal,
   the Runtime's anonymous remote client, and deployment instructions.
+- `COMMUNITY_DISCOVERY_SPEC.md` — Explore, search, filters, the public
+  Release/profile pages, and the Runtime handoff.
 - `I18N_SPEC.md` — locale negotiation, fallback, translation-key
   conventions, and the Runtime-UI/Mod-content localization boundary.
 - `DISTRIBUTION_SPEC.md` — how `.vgame`/standalone `.html` packaging works.

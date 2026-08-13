@@ -392,5 +392,38 @@ VMP 1 / Package Format 1 remain frozen; Workspace Format 1 / Community
 Release Format 1 each gained one additive, optional field
 (`communityParentReleaseId`) with no version bump.
 
-## STOP — Marketplace discovery UI, likes/comments/ratings, moderation,
-## recommendations remain explicitly out of scope for the next milestone.
+## Runtime 0.2 — Community Discovery & Release Pages (checkpoint reached)
+
+Turned the Community backend into a usable, anonymous-first public
+discovery experience inside `community.html`: an Explore landing page
+(search + language/tag filters + keyset pagination, `published_at DESC`
+only -- no ranking algorithm), a public Release detail page (metadata,
+Mods as read-only text, an honest version-Compatibility label, parent/
+child lineage, download, Open in Runtime, Remix, Copy Link), and a public
+creator profile page. One new read-model view
+(`community_release_cards`, `security_invoker`, Security-Advisor-clean)
+avoids N+1 queries. `index.html` gained exactly one new hook
+(`?communityRelease=<uuid>` auto-preview, never auto-execute) as the
+receiving end of the Portal's Runtime handoff. Two real bugs were found
+and fixed live during testing: an expired session token silently broke
+anonymous Explore (fixed via an explicit `anon: true` no-token-attach
+flag), and `showMsg()` misuse wiped an entire composed page section
+instead of showing an inline status line (fixed with a new, non-
+destructive `appendMsg()`). A live security test also produced a
+corrected finding, not just a passing result: `file://`-opening
+`index.html`/`community.html` from the same directory does **not**
+provide origin isolation in the tested environment, proving (rather than
+merely asserting) why the origin-separation requirement is load-bearing
+-- see `COMMUNITY_DISCOVERY_SPEC.md` § 2/10. `RUNTIME_VERSION` remains
+`0.2.0-dev`; API 1 / VMP 1 / Package Format 1 / Workspace Format 1 /
+Community Release Format 1 are all unchanged -- no format gained or lost
+a field this milestone. Full design, query contract, and acceptance-test
+results: `COMMUNITY_DISCOVERY_SPEC.md`.
+
+Likes/comments/ratings/follows/notifications/ranking/recommendation/a
+moderation dashboard/public Mod sandboxing remain explicitly out of
+scope and not started.
+
+## STOP — likes/comments/ratings, follows, notifications, ranking/
+## recommendation, a moderation dashboard, and public Mod sandboxing
+## remain explicitly out of scope for the next milestone.

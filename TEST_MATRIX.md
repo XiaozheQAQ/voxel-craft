@@ -444,3 +444,37 @@ additions ✅; entire test pass conducted live in zh-CN ✅; secret scan of
 for service-role/secret key patterns — zero matches ✅. 3+ Mod Release
 round-trip covered by construction, not re-run as a dedicated pass (the
 publish RPC's mod-index insert has no mod-count-specific code path).
+
+## Runtime 0.2 — Community Discovery & Release Pages results
+
+Full results: `COMMUNITY_DISCOVERY_SPEC.md` § 12. All run live against
+the real linked Supabase project. Summary: anonymous Explore ✅ (found
+and fixed live: an expired session token was breaking anonymous reads
+outright — `anon:true` no-token-attach flag added); zh-CN substring
+search (`水晶`) returns exactly the matching fixtures, no false
+positives ✅; combined search+language filter ✅; tag filter with
+clear-chip UI ✅; keyset pagination (9 real rows, 4-per-page walk, zero
+duplicates/gaps) ✅; Release detail full-field rendering (found and
+fixed live: `showMsg()` misuse was wiping the entire detail panel down
+to one line — new non-destructive `appendMsg()`/`toast()` helpers) ✅;
+parent/child lineage (A→C) ✅; withdrawn-parent handling (temporarily
+withdrew a real fixture, verified "original unavailable" + generation
+preserved + page unbroken, restored afterward) ✅; `.vrelease` download
+round-trip ✅; Open in Runtime (`?communityRelease=`) auto-preview with
+zero Mods active until explicit Open ✅; no-Auth-token-leak test — code
+verified clean, **but a real, corrected finding**: `file://`-opening
+both files from the same directory shares one origin in the tested
+environment, proving the origin-separation requirement is load-bearing
+(see spec § 2/10) ✅; XSS/hostile metadata (`<img onerror>`, `<svg
+onload>`, hostile author/tag/release-note) safe everywhere including the
+document `<title>`, zero alerts ✅; anonymous RLS check with **no**
+client-side filter applied — zero unpublished rows returned ✅;
+search-input attack strings safe after a real encoding bug was found and
+fixed (`100% off` broke the request outright before the fix) ✅, with one
+string blocked upstream by a platform WAF (HTTP 403, confirmed via
+`curl`, not an app-level control) ✅; zh-CN full flow ✅; en-US
+regression ✅; `community.html` catalog parity (118/118, zero mismatch)
+✅; mobile layout at 320×568 and 375×812 (zero horizontal overflow,
+verified via `scrollWidth`) ✅; offline/outage regression by construction
+✅; Security/Performance Advisor clean after the new view (no
+`security_definer_view` finding) ✅.
