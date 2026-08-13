@@ -453,20 +453,36 @@ and fixed live: an expired session token was breaking anonymous reads
 outright — `anon:true` no-token-attach flag added); zh-CN substring
 search (`水晶`) returns exactly the matching fixtures, no false
 positives ✅; combined search+language filter ✅; tag filter with
-clear-chip UI ✅; keyset pagination (9 real rows, 4-per-page walk, zero
-duplicates/gaps) ✅; Release detail full-field rendering (found and
-fixed live: `showMsg()` misuse was wiping the entire detail panel down
-to one line — new non-destructive `appendMsg()`/`toast()` helpers) ✅;
-parent/child lineage (A→C) ✅; withdrawn-parent handling (temporarily
-withdrew a real fixture, verified "original unavailable" + generation
-preserved + page unbroken, restored afterward) ✅; `.vrelease` download
-round-trip ✅; Open in Runtime (`?communityRelease=`) auto-preview with
-zero Mods active until explicit Open ✅; no-Auth-token-leak test — code
-verified clean, **but a real, corrected finding**: `file://`-opening
-both files from the same directory shares one origin in the tested
-environment, proving the origin-separation requirement is load-bearing
-(see spec § 2/10) ✅; XSS/hostile metadata (`<img onerror>`, `<svg
-onload>`, hostile author/tag/release-note) safe everywhere including the
+clear-chip UI ✅; keyset pagination at the real production
+`DISCOVERY_PAGE_SIZE=20` — 25 real fixtures, page-1=20 (verified via the
+app's own `?limit=20` network request), page-2=5 (verified via the
+app's own "Load more" click and its cursor-bearing request), 0
+duplicates, 0 missing (25 fixtures in, 25 unique ids out); disposable
+test fixtures withdrawn afterward ✅; Release detail full-field rendering
+(found and fixed live: `showMsg()` misuse was wiping the entire detail
+panel down to one line — new non-destructive `appendMsg()`/`toast()`
+helpers, and the same latent bug was found and fixed in three more
+auth-required early-return branches during this audit) ✅; direct-child-
+only lineage verified against a genuine 3-generation chain (A gen 0 → B
+gen 1, parent=A → D gen 2, parent=B): A's Remixes shows exactly [B], **D
+never appears as A's direct child**; B's Remixes shows exactly [D]; D's
+Remixes is empty — confirmed both by direct query and in the live UI at
+all three levels ✅; withdrawn-parent handling (temporarily withdrew a
+real fixture, verified "original unavailable" + generation preserved +
+page unbroken, restored afterward) ✅; `.vrelease` download round-trip
+✅; Open in Runtime (`?communityRelease=`) auto-preview with zero Mods
+active until explicit Open ✅; **file:// Auth boundary — now enforced in
+code, not just documented**: found live that `file://`-opening both
+files from the same directory shares one origin (`location.origin ===
+"file://"` for both), making a Community session physically readable
+from the Runtime's `localStorage`; fixed by having `community.html`
+detect `file:` and disable sign-in/sign-up/session-restore/publish/
+profile-mutation/withdraw outright (function-level guards, not just UI);
+re-verified after the fix: session key is `null` immediately on a
+`file://` load even with a real prior session present, and a real sign-
+in still succeeds normally when the same file is served via
+`http://localhost` instead ✅; XSS/hostile metadata (`<img onerror>`,
+`<svg onload>`, hostile author/tag/release-note) safe everywhere including the
 document `<title>`, zero alerts ✅; anonymous RLS check with **no**
 client-side filter applied — zero unpublished rows returned ✅;
 search-input attack strings safe after a real encoding bug was found and

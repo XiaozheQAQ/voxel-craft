@@ -1080,3 +1080,38 @@ table; no Workspace/Release Format field changed. `API_VERSION`/
 `COMMUNITY_RELEASE_FORMAT_VERSION` all remain unchanged. `RUNTIME_VERSION`
 remains `0.2.0-dev`. Full design, query contract, and acceptance-test
 results: `COMMUNITY_DISCOVERY_SPEC.md`.
+
+014 (Runtime 0.2, Community Discovery release-blocker audit): a
+pre-push audit of 013 found three issues requiring fixes, not just
+wording corrections. (1) The `file://` origin-sharing finding from 013
+had only been documented, not enforced -- fixed by having
+`community.html` detect `location.protocol === 'file:'` and disable
+every authenticated capability outright (sign in, sign up, session
+restore, publish, profile mutation, withdraw), both by not rendering the
+forms and, defense-in-depth, by having the underlying functions
+(`assertAuthAllowed()`) refuse to run; a poisoned/shared session key is
+now actively cleared rather than merely ignored. Re-verified live: a
+`file://` reload with a real prior session present resulted in a `null`
+session immediately, while the same file served via
+`http://localhost:4173` signed in normally. (2) 013's pagination report
+was internally inconsistent (page size 20 claimed alongside a 9-row/
+4-per-page test); audited and corrected: the 4-per-page walk was a
+separate, explicitly test-only page size run as a standalone query
+script, never the app's own code path; the actual production
+`DISCOVERY_PAGE_SIZE=20` was then verified through the real
+`community.html` UI after publishing enough fixtures to exceed one page
+(25 fixtures, page-1=20, page-2=5, 0 duplicates, 0 missing, both counts
+read from the app's own real network requests). (3) 013's lineage test
+wording ("A->C") was audited against the canonical direct-children-only
+requirement; found to be an imprecise report of a 2-level chain, not an
+implementation bug -- re-verified against a genuine 3-generation chain
+(A gen 0 -> B gen 1 -> D gen 2): A's direct children = [B] only, D never
+appears under A; confirmed both via direct query and the live UI at all
+three levels. A fourth, related latent bug was found during this audit
+and fixed alongside the file:// notice: the same `showMsg()`-clears-its-
+container defect from 013 also existed in three "sign-in required"
+early-return branches (Profile/Publish/My Releases when not signed in),
+wiping their heading; fixed with the same `appendMsg()` pattern. No
+schema, format, or `RUNTIME_VERSION` change. Full corrected details:
+`COMMUNITY_DISCOVERY_SPEC.md` § 2/6/10/12, `COMMUNITY_BACKEND_SETUP.md`
+§ 6.

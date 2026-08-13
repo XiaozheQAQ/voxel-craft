@@ -603,8 +603,15 @@ testing) resulted in both files reporting `location.origin === "file://"`
 directly readable from `index.html`'s `localStorage`. `index.html`'s own
 code still never touched it (confirmed by inspection), but this is
 concrete proof that a `file://`-based local setup does not by itself
-demonstrate the isolation this design depends on. See
-`COMMUNITY_DISCOVERY_SPEC.md` § 2/10 for the full test and
+demonstrate the isolation this design depends on.
+
+**This finding was then closed with a code fix in `community.html`
+itself, not left as a documentation-only caveat**: it now detects
+`location.protocol === 'file:'` and disables every authenticated
+capability outright (sign in, sign up, session restore, publish, profile
+mutation, withdraw) while leaving anonymous public reads fully working.
+`index.html` required no change — it never held a token in the first
+place. See `COMMUNITY_DISCOVERY_SPEC.md` § 2/10 for the full test and
 `COMMUNITY_BACKEND_SETUP.md` § 6 for corrected local-dev guidance.
 
 ## Runtime 0.2 — Community Discovery & Release Pages

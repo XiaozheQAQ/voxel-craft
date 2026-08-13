@@ -167,6 +167,33 @@
   const KNOWN_VMP_VERSION = 1;
 
   const SESSION_STORAGE_KEY = 'voxelcraft.community.portal.session.v1';
+
+  // ===================================================================
+  // file:// Auth boundary — CODE-ENFORCED, not just documented.
+  //
+  // Live testing during the Discovery milestone proved that opening
+  // index.html and community.html via file:// from the same directory
+  // gives both pages the SAME origin in the tested environment
+  // (`location.origin` was the literal string "file://" for both), so a
+  // Community session stored by this page was directly readable from
+  // index.html's localStorage — and index.html executes untrusted Mod
+  // code with no sandbox. Switching storage keys or moving to
+  // sessionStorage does not fix this: sessionStorage is still readable
+  // by same-origin script, and the underlying problem is that file://
+  // does not reliably give the two pages different origins at all, not
+  // which storage API or key name is used.
+  //
+  // The only real fix is to never let an authenticated Community
+  // session exist at all while this page is running from file://.
+  // Everything gated by `session` below (sign in, sign up, session
+  // restore, publish, profile mutation, My Releases, withdraw) is
+  // disabled outright when `IS_FILE_PROTOCOL` is true; anonymous public
+  // reads (Explore/search/filters/Release detail/public profiles/
+  // download) are completely unaffected. See COMMUNITY_BACKEND_SETUP.md
+  // § 6 and COMMUNITY_DISCOVERY_SPEC.md § 2 for the full writeup and the
+  // recommended localhost/HTTPS-origin-pair development setup.
+  // ===================================================================
+  const IS_FILE_PROTOCOL = location.protocol === 'file:';
   const MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024;
   const MAX_MOD_COUNT = 32;
   const MAX_MOD_SOURCE_BYTES = 256 * 1024;
@@ -287,7 +314,11 @@
       'profile.releasesTitle': 'Releases',
       'profile.empty': 'This creator has not published any games yet.',
       'profile.editBtn': 'Edit Profile',
-      'profile.pageTitleSuffix': ' — Voxel Craft Community'
+      'profile.pageTitleSuffix': ' — Voxel Craft Community',
+
+      // --- file:// Auth boundary ---
+      'security.fileProtocolTitle': 'Sign-in is disabled in file:// mode',
+      'security.fileProtocolNotice': 'To keep Community sign-in credentials from being shared with the Mod Runtime\'s browser storage, sign-in is disabled while this page is opened via file://. Open the Community Portal through a localhost or HTTPS address instead.'
     },
     'zh-CN': {
       title: 'Voxel Craft — 社区门户',
@@ -393,7 +424,11 @@
       'profile.releasesTitle': '作品',
       'profile.empty': '该创作者尚未发布任何作品。',
       'profile.editBtn': '编辑资料',
-      'profile.pageTitleSuffix': ' — Voxel Craft 社区'
+      'profile.pageTitleSuffix': ' — Voxel Craft 社区',
+
+      // --- file:// Auth boundary ---
+      'security.fileProtocolTitle': 'file:// 模式下已禁用账号登录',
+      'security.fileProtocolNotice': '为避免社区登录凭据与 Mod Runtime 共享浏览器存储，file:// 模式下已禁用账号登录。请通过 localhost 或 HTTPS 打开社区门户。'
     }
   };
 
@@ -453,12 +488,23 @@
   let session = null; // {access_token, refresh_token, expires_at, user:{id,email}}
 
   function loadSession(){
+    if(IS_FILE_PROTOCOL){
+      // Never restore a session in file:// mode -- and actively remediate
+      // any session a non-file:// visit to this same path may have left
+      // behind (or that a shared-origin file:// environment exposed),
+      // since we know from live testing that this key can be reachable
+      // from index.html's storage under file://.
+      try{ localStorage.removeItem(SESSION_STORAGE_KEY); }catch(e){}
+      session = null;
+      return;
+    }
     try{
       const raw = localStorage.getItem(SESSION_STORAGE_KEY);
       if(raw) session = JSON.parse(raw);
     }catch(e){ session = null; }
   }
   function saveSession(){
+    if(IS_FILE_PROTOCOL){ session = null; return; } // belt-and-suspenders: never persist under file://
     try{
       if(session) localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
       else localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -510,7 +556,16 @@
     return resp;
   }
 
+  function assertAuthAllowed(){
+    if(IS_FILE_PROTOCOL){
+      const e = new Error('Community sign-in is disabled in file:// mode.');
+      e.code = 'COMMUNITY_AUTH_DISABLED_FILE_PROTOCOL';
+      throw e;
+    }
+  }
+
   async function authSignUp(email, password){
+    assertAuthAllowed();
     const resp = await callFetch('/auth/v1/signup', {method:'POST', body: JSON.stringify({email, password})});
     const data = await resp.json().catch(()=>({}));
     if(!resp.ok){
@@ -527,6 +582,7 @@
   }
 
   async function authSignIn(email, password){
+    assertAuthAllowed();
     const resp = await callFetch('/auth/v1/token?grant_type=password', {method:'POST', body: JSON.stringify({email, password})});
     const data = await resp.json().catch(()=>({}));
     if(!resp.ok){
@@ -561,6 +617,7 @@
   }
 
   async function publishViaEdgeFunction(releaseText){
+    assertAuthAllowed();
     if(!session || !session.access_token){ const e = new Error('auth required'); e.code = 'COMMUNITY_AUTH_REQUIRED'; throw e; }
     const resp = await callFetch('/functions/v1/publish-release', {
       method: 'POST',
@@ -1001,8 +1058,20 @@
     else document.title = t('title');
   }
 
+  // Rendered in place of any Auth-gated view (sign-in form, profile
+  // edit, publish, my releases) whenever IS_FILE_PROTOCOL is true.
+  // Returns true if it rendered the notice (caller should stop), false
+  // otherwise.
+  function renderFileProtocolNoticeIfNeeded(panel){
+    if(!IS_FILE_PROTOCOL) return false;
+    panel.appendChild(el('h2', null, t('security.fileProtocolTitle')));
+    appendMsg(panel, 'warn', t('security.fileProtocolNotice'));
+    return true;
+  }
+
   function viewAuth(){
     const panel = el('div', 'panel');
+    if(renderFileProtocolNoticeIfNeeded(panel)){ root.appendChild(panel); return; }
     if(session && session.user){
       panel.appendChild(el('h2', null, t('signIn')));
       const msg = el('div');
@@ -1089,9 +1158,10 @@
 
   function viewProfile(){
     const panel = el('div', 'panel');
+    if(renderFileProtocolNoticeIfNeeded(panel)){ root.appendChild(panel); return; }
     panel.appendChild(el('h2', null, t('profileTitle')));
     if(!session || !session.user){
-      showMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
+      appendMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
       root.appendChild(panel);
       return;
     }
@@ -1128,6 +1198,7 @@
       }
       saveBtn.disabled = true;
       try{
+        assertAuthAllowed();
         await restRequest('/profiles', {
           method: 'POST',
           headers: {Prefer: 'resolution=merge-duplicates,return=minimal'},
@@ -1157,9 +1228,10 @@
 
   function viewPublish(){
     const panel = el('div', 'panel');
+    if(renderFileProtocolNoticeIfNeeded(panel)){ root.appendChild(panel); return; }
     panel.appendChild(el('h2', null, t('publishTitle')));
     if(!session || !session.user){
-      showMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
+      appendMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
       root.appendChild(panel);
       return;
     }
@@ -1260,9 +1332,10 @@
 
   function viewMine(){
     const panel = el('div', 'panel');
+    if(renderFileProtocolNoticeIfNeeded(panel)){ root.appendChild(panel); return; }
     panel.appendChild(el('h2', null, t('mineTitle')));
     if(!session || !session.user){
-      showMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
+      appendMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
       root.appendChild(panel);
       return;
     }
@@ -1300,6 +1373,7 @@
               if(!confirm(t('unpublishConfirm'))) return;
               unpubBtn.disabled = true;
               try{
+                assertAuthAllowed();
                 await restRequest('/community_releases?id=eq.' + encodeURIComponent(row.id), {
                   method: 'PATCH',
                   headers: {Prefer: 'return=minimal'},

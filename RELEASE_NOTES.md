@@ -39,6 +39,15 @@ public creator profile page — all inside `community.html`.
   token. The Runtime auto-previews that Release (same trust-notice/
   Cancel/Open pipeline as any other Open Release path) but never
   auto-executes its Mods; opening still requires an explicit click.
+- **`file://` Auth boundary, enforced in code**: live testing found that
+  opening `index.html` and `community.html` via `file://` from the same
+  directory shares one browser origin, making a signed-in Community
+  session physically readable from the Runtime's storage.
+  `community.html` now detects `file://` and disables sign-in, sign-up,
+  session restore, publish, profile editing, and withdraw outright —
+  Explore/search/filters/Release detail/public profiles/download remain
+  fully available. Signing in still works normally when the Portal is
+  served via `localhost` or HTTPS.
 - Full English + Simplified Chinese support, including hostile-content
   safety (`<img onerror>`, `<svg onload>`, and similar payloads verified
   live to render as inert text everywhere — cards, search results, the

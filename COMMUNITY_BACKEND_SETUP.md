@@ -178,6 +178,40 @@ trusting the setup. For anything beyond purely local, single-user
 testing, use the `community.example.com`/`play.example.com`-style split
 above — it is the only configuration this document treats as verified-safe.
 
+**Update (Community Discovery milestone) — this is now enforced in
+code, not just documented as a risk.** `community.html` detects
+`location.protocol === 'file:'` at load and disables every authenticated
+feature outright (sign in, sign up, session restore, publish, profile
+edits, unpublish) — both by never rendering the forms and, defense-in-
+depth, by having the underlying functions themselves refuse to run.
+Public reads (Explore, search, filters, Release detail, public profiles,
+`.vrelease` download) are unaffected. Practical consequence for local
+development:
+
+```
+Allowed via file://community.html:   Explore, search, filters, Release detail,
+                                       public profiles, .vrelease download
+Requires localhost or HTTPS:          sign in, sign up, publish, profile edit,
+                                       withdraw, My Releases
+```
+
+Recommended local-dev pairing:
+
+```
+http://localhost:4173/community.html   (authenticated Portal)
+file://.../index.html                  (Runtime)
+```
+
+or, if you want to verify true origin separation end-to-end:
+
+```
+http://localhost:4173/community.html   (authenticated Portal)
+http://localhost:4174/index.html       (Runtime)
+```
+
+Do not serve the authenticated Portal and the Mod-executing Runtime from
+the same host+port when untrusted Mods are possible.
+
 ## 7. Row Level Security is not optional
 
 Every table this milestone introduces has RLS enabled with an explicit
