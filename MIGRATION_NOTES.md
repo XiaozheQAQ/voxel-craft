@@ -1020,3 +1020,34 @@ origin. `API_VERSION`/`VMP_VERSION`/`GAME_PACKAGE_FORMAT_VERSION`/
 `WORKSPACE_FORMAT_VERSION` all remain unchanged -- nothing here is
 `api.*`. `RUNTIME_VERSION` remains `0.2.0-dev`. Full design and
 acceptance-test results: `COMMUNITY_RELEASE_SPEC.md`.
+
+012 (Runtime 0.2, Community Backend Foundation): persisted Community
+Releases remotely (Supabase Postgres + RLS + one Edge Function) behind a
+hard security boundary -- `index.html` never holds a Community Auth
+session; a new, separate file, `community.html`, owns all Auth/publish/
+profile/manage UI and never executes Mod source. `runtime.community`
+gained three anonymous-only remote methods (`getRelease`/`getChildren`/
+`getProfile`), implemented as plain `fetch()` calls against a publishable
+key only -- no login/session/token method exists on this object. Both
+Workspace Format 1 and Community Release Format 1 gained one additive
+field each (`communityParentReleaseId`, the *remote* parent id, distinct
+from the existing local `parentReleaseId`) -- no format version bump on
+either. Found and fixed one real bug during implementation: the first
+`publish-release` Edge Function read `provenance.parentReleaseId` (a
+local-only id) as the remote lineage input, which would have silently
+failed to link any real parent -- caught before deployment testing by
+inspecting `buildRelease()`'s actual output, fixed by introducing the
+distinct `communityParentReleaseId` field end-to-end. Verified live
+against the actual linked Supabase project: migration applies cleanly,
+Security/Performance Advisor clean after one follow-up fix migration
+(`search_path`/`auth_rls_initplan` findings), two-user RLS attack tests
+and fully-anonymous write attempts all correctly blocked, server-computed
+lineage with a forged `generation:999` silently ignored, a full A->B
+remote round-trip (real fetch -> Start Remix -> local `.vrelease` export
+-> Portal publish -> live DB row with correct `generation`/
+`parent_release_id`), and a complete zh-CN pass. `API_VERSION`/
+`VMP_VERSION`/`GAME_PACKAGE_FORMAT_VERSION` remain unchanged -- nothing
+here is `api.*`. `RUNTIME_VERSION` remains `0.2.0-dev` -- this milestone
+is not a stable 0.2 release. Full design, schema, RLS matrix, and
+acceptance-test results:
+`COMMUNITY_BACKEND_SPEC.md` / `COMMUNITY_BACKEND_SETUP.md`.

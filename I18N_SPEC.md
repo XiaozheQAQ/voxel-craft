@@ -282,3 +282,25 @@ trust notice, drop zone, and error strings), reusing several existing
 explanation is effectively identical rather than maintaining near-
 duplicate wording. Catalog parity reverified: 208 keys per locale, zero
 mismatch. See `COMMUNITY_RELEASE_SPEC.md` § i18n.
+
+## Runtime 0.2 addendum — Community Backend Foundation
+
+Nine new `community.remote*` keys in `index.html`'s Runtime catalog, for
+the new "Open Community Release (remote)" Workshop action
+(`remoteOpen`/`remoteOpenHint`/`remoteIdLabel`/`remoteFetchButton`/
+`remoteFetching`/`remoteNotFound`/`remoteNetworkError`/
+`remoteNotConfigured`/`remotePermissionDenied`) — distinct from, and
+additive alongside, the existing local `community.*` family from the
+prior milestone. Catalog parity reverified via the `?dev=1` audit ("all
+locale catalogs are in sync with en-US"): 217 keys per locale, zero
+mismatch.
+
+`community.html` (the new Community Portal) is a **separate file with
+its own, self-contained i18n catalog** (`en-US`/`zh-CN`), intentionally
+not sharing storage, keys, or a catalog object with the Runtime's
+`runtime.i18n` — the two files are meant to be independently
+deployable/versionable. Its catalog covers Auth (sign-up/sign-in/
+sign-out, email-confirmation-required messaging), profile editing,
+publish preview/confirm, My Releases management, and public-release
+lookup — verified live end-to-end in `zh-CN`, including hostile-content
+strings rendered correctly as literal text. See `COMMUNITY_BACKEND_SPEC.md`.

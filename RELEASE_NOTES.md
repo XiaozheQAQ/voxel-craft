@@ -5,8 +5,51 @@ Runtime 0.2.0-dev
 API 1 — frozen
 VMP 1 — frozen
 Voxel Game Package Format 1 — frozen
-Voxel Creation Workspace Format 1 — new
+Voxel Creation Workspace Format 1 — one additive field
+Voxel Community Release Format 1 — one additive field
 ```
+
+## Runtime 0.2.0-dev — Community Backend Foundation
+
+Not yet declared stable — `RUNTIME_VERSION` remains `0.2.0-dev` for this
+milestone; this is a checkpoint within the 0.2 development line, not a
+0.2 release.
+
+Community Releases can now be persisted to a real backend (Supabase) and
+fetched back into the Runtime by anyone — while the Runtime itself still
+never signs in, holds a session, or talks to the backend except through
+explicit, anonymous, public reads.
+
+- **New file: `community.html`** (the Community Portal) — a separate
+  page that owns all Auth/identity: sign up, sign in, edit your public
+  profile, upload and preview a `.vrelease` before publishing it, manage
+  your published Releases (copy id, download, unpublish), and look up any
+  public Release by id to see its metadata, direct parent, and direct
+  remixes. It never executes Mod source — source is always shown as
+  read-only text.
+- **Runtime → Workshop → Export → "Open Community Release (remote)"**: a
+  new field lets you fetch a public Release by its remote id directly
+  from the backend — an anonymous, public read reusing the *exact same*
+  preview/trust-notice/Open/Start Remix pipeline a local `.vrelease` file
+  already used. No new Mod loader was added.
+- **Security architecture**: the Runtime (`index.html`) never holds a
+  Community Auth token — that lives only in `community.html`, which in a
+  real deployment is meant to run on a separate origin from the Runtime.
+  See `COMMUNITY_BACKEND_SPEC.md` for the full boundary and why it
+  matters (Mods run as trusted, same-realm code — any token in that page
+  would be reachable from Mod code).
+- Server-side: Postgres RLS policies (verified with live two-account
+  attack tests — cross-user unpublish/retitle/creator-forgery attempts
+  all correctly blocked), an immutability trigger (a published Release's
+  content can never be edited, only withdrawn), and a single atomic
+  publish transaction that computes remix lineage (`generation`/parent)
+  itself — a forged client-side `generation` value is silently ignored.
+- Full English + Simplified Chinese support end-to-end, including a live
+  zh-CN test pass of the entire sign-up → publish → fetch → remix →
+  publish-child loop.
+- See `COMMUNITY_BACKEND_SPEC.md` for the complete design, schema, RLS
+  matrix, and acceptance-test results, and `COMMUNITY_BACKEND_SETUP.md`
+  for deployment instructions.
 
 ## Runtime 0.2.0-dev — Creation Workspace & Provenance
 
@@ -254,6 +297,11 @@ the same as you would any other executable.
   branching ("Revise from this version").
 - `WORKSPACE_SPEC.md` — `.vwork` Creation Workspace format, identity,
   provenance, and fork/remix semantics.
+- `COMMUNITY_RELEASE_SPEC.md` — the local `.vrelease` format and publish/
+  open/remix UX.
+- `COMMUNITY_BACKEND_SPEC.md` / `COMMUNITY_BACKEND_SETUP.md` — the
+  Supabase-backed Community backend: schema, RLS, the Community Portal,
+  the Runtime's anonymous remote client, and deployment instructions.
 - `I18N_SPEC.md` — locale negotiation, fallback, translation-key
   conventions, and the Runtime-UI/Mod-content localization boundary.
 - `DISTRIBUTION_SPEC.md` — how `.vgame`/standalone `.html` packaging works.

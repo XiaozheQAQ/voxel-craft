@@ -460,3 +460,28 @@ of**, not instead of, the existing local `authorDisplayName` field
 (treating it as a display fallback for content published before accounts
 existed). None of this is implemented in Runtime 0.2 — this section is
 guidance for the next milestone, not a commitment made by this one.
+
+## Addendum (Runtime 0.2 — Community Backend Foundation)
+
+The backend described as future guidance above now exists — see
+`COMMUNITY_BACKEND_SPEC.md`. It persists this exact model (verbatim
+`snapshot_text`, `parentReleaseId`-style lineage, non-authoritative
+`contentHash`) rather than inventing a second one, as recommended. Two
+things changed at the margins, both purely additive to this document's
+Release Format 1 (no format version bump):
+
+- `provenance` gains **`communityParentReleaseId`**, alongside the
+  existing (local) `parentReleaseId` — the *remote* `community_releases.id`
+  of this Release's parent, when this Workspace was started via Start
+  Remix from a Release fetched from the backend. `releaseId`/
+  `parentReleaseId` (this document's own fields) remain purely local and
+  are never sent to, or trusted by, the backend for lineage purposes —
+  see `COMMUNITY_BACKEND_SPEC.md` § 10–11 for why the two identifiers are
+  kept strictly separate.
+- Workspace Format 1's own `provenance` gains the matching
+  `communityParentReleaseId` field (§ 10 above already documented this
+  pattern for `parentReleaseId`; the new field follows it identically).
+
+The Community Card view model (§ 22) and everything else in this
+document is unchanged — the backend reads exactly the Release shape
+already specified here.

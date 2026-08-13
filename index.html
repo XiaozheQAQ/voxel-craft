@@ -869,6 +869,15 @@ const I18N_MESSAGES = {
     'community.invalid': 'That file is not a valid Community Release (.vrelease).',
     'community.validationFailed': 'That release could not be validated ({id}).',
     'community.sessionNotClean': 'Reload the Runtime, then open this release into a fresh session.',
+    'community.remoteOpen': 'Open Community Release (remote)',
+    'community.remoteOpenHint': 'Fetch a public Release from the Community backend by its remote ID. This is an anonymous, public read only -- this Runtime never signs in or holds an account.',
+    'community.remoteIdLabel': 'Remote Release ID',
+    'community.remoteFetchButton': 'Fetch',
+    'community.remoteFetching': 'Fetching…',
+    'community.remoteNotFound': 'That release could not be found, or is not public.',
+    'community.remoteNetworkError': 'Could not reach the Community backend. Check your connection and try again.',
+    'community.remoteNotConfigured': 'The Community backend is not configured on this Runtime.',
+    'community.remotePermissionDenied': 'You do not have permission to view that release.',
 
     'workshop.errors.loadFailedTitle': 'Mod could not be loaded',
     'workshop.errors.unknown': 'An unknown error occurred.',
@@ -1097,6 +1106,15 @@ const I18N_MESSAGES = {
     'community.invalid': '该文件不是有效的社区作品发布 (.vrelease)。',
     'community.validationFailed': '该作品发布无法通过校验（{id}）。',
     'community.sessionNotClean': '请重新加载 Runtime 后再打开另一个作品发布。',
+    'community.remoteOpen': '打开社区作品（远程）',
+    'community.remoteOpenHint': '通过远程 ID 从社区后端获取一个公开的作品发布。这只是一次匿名的公开读取 —— 本 Runtime 从不登录，也不持有任何账号。',
+    'community.remoteIdLabel': '远程作品 ID',
+    'community.remoteFetchButton': '获取',
+    'community.remoteFetching': '获取中…',
+    'community.remoteNotFound': '未找到该作品发布，或该作品未公开。',
+    'community.remoteNetworkError': '无法连接到社区后端，请检查网络后重试。',
+    'community.remoteNotConfigured': '此 Runtime 尚未配置社区后端。',
+    'community.remotePermissionDenied': '你没有权限查看该作品发布。',
 
     'workshop.errors.loadFailedTitle': '模组无法加载',
     'workshop.errors.unknown': '发生未知错误。',
@@ -4540,7 +4558,17 @@ function buildWorkspace({title, description, author, modIds, settings, originalR
       // WORKSPACE_FORMAT_VERSION (spec § Workspace provenance extension).
       // A Workspace derived from a Release (not a Workspace fork) carries
       // this instead of/alongside parentWorkspaceId; see startRemixWorkspace.
-      provenance: { parentWorkspaceId: null, parentReleaseId: null, parentTitle: null, generation: 0, derivedFrom: null }
+      // communityParentReleaseId (Runtime 0.2 Community Backend
+      // Foundation) is a SECOND, distinct optional addition, alongside
+      // parentReleaseId above: parentReleaseId is the LOCAL .vrelease
+      // releaseId (spec's original field); communityParentReleaseId is
+      // the server-issued (remote) community_releases.id, present only
+      // when this Workspace was started via Start Remix from a Release
+      // that was itself fetched from the Community backend. The two are
+      // never conflated -- see COMMUNITY_BACKEND_SPEC.md "Remote/local
+      // release identity". Still purely additive; WORKSPACE_FORMAT_VERSION
+      // stays 1.
+      provenance: { parentWorkspaceId: null, parentReleaseId: null, communityParentReleaseId: null, parentTitle: null, generation: 0, derivedFrom: null }
     };
   }
   __currentWorkspace.title = String(title == null ? '' : title).trim() || 'Untitled Workspace';
@@ -4634,7 +4662,7 @@ function importWorkspace(ws){
     // ws.provenance.parentReleaseId is read as-is if present; an OLDER
     // Workspace Format 1 file written before Community Foundation simply
     // lacks the field, which is fine -- it was always optional.
-    provenance: ws.provenance || {parentWorkspaceId:null, parentReleaseId:null, parentTitle:null, generation:0, derivedFrom:null}
+    provenance: ws.provenance || {parentWorkspaceId:null, parentReleaseId:null, communityParentReleaseId:null, parentTitle:null, generation:0, derivedFrom:null}
   };
   markWorkspaceClean(); // just opened, nothing changed yet
   if(ws.workspace && ws.workspace.title) document.title = ws.workspace.title + ' — Voxel Craft';
@@ -4699,6 +4727,7 @@ function startRemixWorkspace(sourceArtifactType, sourceTitle, opts){
     title: sourceTitle || null,
     provenance: {
       parentWorkspaceId: null, parentReleaseId: opts.parentReleaseId || null,
+      communityParentReleaseId: opts.communityParentReleaseId || null,
       parentTitle: sourceTitle || null, generation: parentGen + 1,
       derivedFrom: {artifactType: sourceArtifactType}
     }
@@ -4805,7 +4834,15 @@ function resolveReleaseParent(explicitParent){
   if(__lastPublishedRelease) return __lastPublishedRelease;
   const ws = runtime.workspace.current;
   if(ws && ws.provenance && ws.provenance.parentReleaseId){
-    return { releaseId: ws.provenance.parentReleaseId, title: ws.provenance.parentTitle, generation: ws.provenance.generation - 1 };
+    // communityParentReleaseId only exists here if this Workspace was
+    // itself started via Start Remix from a Release that had been
+    // FETCHED FROM THE COMMUNITY BACKEND (see startRemixFromRelease) --
+    // it is NOT auto-chained across repeated in-session Publish clicks
+    // the way the local releaseId chain is (__lastPublishedRelease,
+    // above, never carries a remote id -- this Runtime never talks to
+    // the network, so a remote id only ever originates from a prior
+    // fetch). See COMMUNITY_BACKEND_SPEC.md "Remaining limitations".
+    return { releaseId: ws.provenance.parentReleaseId, communityParentReleaseId: ws.provenance.communityParentReleaseId || null, title: ws.provenance.parentTitle, generation: ws.provenance.generation - 1 };
   }
   return null;
 }
@@ -4839,6 +4876,15 @@ function buildRelease({title, description, authorDisplayName, modIds, tags, lang
     mods: pkg.mods,
     provenance: {
       parentReleaseId: parent ? parent.releaseId : null,
+      // communityParentReleaseId (Runtime 0.2 Community Backend
+      // Foundation): the REMOTE community_releases.id of this Release's
+      // parent, when known -- distinct from parentReleaseId (a LOCAL id,
+      // meaningless to the backend). This is what the Community Portal's
+      // publish-release Edge Function reads to link server-side lineage;
+      // parentReleaseId is never sent to, or trusted by, the backend for
+      // that purpose. Purely additive to Release Format 1 -- an older
+      // reader simply ignores an unrecognized field.
+      communityParentReleaseId: parent ? (parent.communityParentReleaseId || null) : null,
       parentTitle: parent ? parent.title : null,
       generation: parent ? parent.generation + 1 : 0,
       remixNote: null
@@ -4899,7 +4945,11 @@ function openRelease(rel){
    chain instead of resetting to 0 -- see startRemixWorkspace's opts. */
 function startRemixFromRelease(rel){
   return runtime.workspace.startRemixWorkspace('release', rel.game.title, {
-    parentReleaseId: rel.releaseId, parentGeneration: rel.provenance.generation
+    parentReleaseId: rel.releaseId, parentGeneration: rel.provenance.generation,
+    // Only set when `rel` was fetched from the Community backend (see
+    // communityGetRelease) rather than opened from a local .vrelease
+    // file -- a purely local Release naturally has no server identity.
+    communityParentReleaseId: rel.__communityRemoteId || null
   });
 }
 
@@ -4921,6 +4971,101 @@ function buildCommunityCard(release){
   };
 }
 
+/* =========================================================
+   Community Backend Foundation (Runtime 0.2) -- anonymous-only remote
+   client. This is `runtime.community`, NOT `api.community` -- API 1
+   stays frozen; this is an internal Runtime capability, same trust
+   tier as the rest of the Runtime's own code, never exposed to Mods.
+
+   SECURITY: this Runtime page NEVER holds a Community Auth session.
+   `COMMUNITY_BACKEND_CONFIG.publishableKey` identifies the project to
+   Supabase's API gateway only -- it grants no privilege by itself
+   (every table/RPC requires RLS, and this client never sends an
+   Authorization: Bearer <token> header). Signing in, publishing, and
+   managing Releases all happen on the separate Community Portal
+   (community.html), which in production is meant to be hosted on a
+   different origin. This client only ever performs anonymous, public
+   reads (getRelease/getChildren/getProfile) -- there is no login,
+   session, or token method here, by design, and none should ever be
+   added to this object. See COMMUNITY_BACKEND_SPEC.md.
+
+   Boot independence: nothing below runs at load time -- every method
+   is only invoked from an explicit Workshop button click, so a
+   missing/unreachable Community backend can never block the Runtime
+   from booting or playing purely local/offline content. */
+const COMMUNITY_BACKEND_CONFIG = {
+  enabled: true,
+  supabaseUrl: 'https://gdfenseaqjhmaspsfpnq.supabase.co',
+  publishableKey: 'sb_publishable_oR6a_j65kCvs6-En27i_vw_YWcNVqiU'
+};
+
+function communityRestUrl(path){
+  return COMMUNITY_BACKEND_CONFIG.supabaseUrl.replace(/\/$/, '') + '/rest/v1' + path;
+}
+
+async function communityAnonFetch(path){
+  if(!COMMUNITY_BACKEND_CONFIG.enabled || !COMMUNITY_BACKEND_CONFIG.supabaseUrl || !COMMUNITY_BACKEND_CONFIG.publishableKey){
+    throw regError('COMMUNITY_NOT_CONFIGURED', path);
+  }
+  let resp;
+  try {
+    resp = await fetch(communityRestUrl(path), {
+      headers: { apikey: COMMUNITY_BACKEND_CONFIG.publishableKey }
+    });
+  } catch(netErr){
+    throw regError('COMMUNITY_NETWORK_ERROR', path);
+  }
+  if(!resp.ok){
+    if(resp.status === 401 || resp.status === 403) throw regError('COMMUNITY_PERMISSION_DENIED', path);
+    throw regError('COMMUNITY_NETWORK_ERROR', path, {status: resp.status});
+  }
+  let data;
+  try { data = await resp.json(); } catch(e){ throw regError('COMMUNITY_NETWORK_ERROR', path); }
+  return data;
+}
+
+/* Fetches ONE published Community Release by its server (remote) id and
+   reconstructs it into the exact same `.vrelease`-shaped object a local
+   file drop would parse -- `snapshot_text` is the verbatim payload
+   captured at publish time (see COMMUNITY_BACKEND_SPEC.md "Snapshot +
+   normalized-fields duality"), so this never re-derives the Release
+   from normalized columns and never risks drifting from what was
+   actually published. The result is handed to the SAME
+   communityPendingImport preview / runtime.community.openRelease /
+   trust-warning / Start Remix pipeline a local .vrelease already uses
+   -- there is no second, remote-specific Mod loader anywhere. */
+async function communityGetRelease(remoteId){
+  if(!remoteId || typeof remoteId !== 'string') throw regError('COMMUNITY_RELEASE_NOT_FOUND', String(remoteId));
+  const rows = await communityAnonFetch('/community_releases?id=eq.' + encodeURIComponent(remoteId) + '&select=id,is_published,snapshot_text');
+  if(!rows || !rows.length){
+    // Could be nonexistent OR withdrawn -- RLS makes both cases return
+    // zero rows to an anonymous caller, so this client cannot (and must
+    // not pretend to) distinguish them further than this.
+    throw regError('COMMUNITY_RELEASE_NOT_FOUND', remoteId);
+  }
+  const row = rows[0];
+  let release;
+  try { release = JSON.parse(row.snapshot_text); }
+  catch(e){ throw regError('COMMUNITY_RELEASE_NOT_FOUND', remoteId); }
+  release.__communityRemoteId = row.id; // informational only, not part of Release Format 1
+  return release;
+}
+
+/* Direct remixes of a remote Release (public, published only) -- used
+   only by the optional "direct remixes" display; never a
+   browsing/discovery UI. */
+async function communityGetChildren(remoteId){
+  if(!remoteId) return [];
+  const rows = await communityAnonFetch('/community_releases?parent_release_id=eq.' + encodeURIComponent(remoteId) + '&is_published=eq.true&select=id,title,generation');
+  return rows || [];
+}
+
+async function communityGetProfile(userId){
+  if(!userId) return null;
+  const rows = await communityAnonFetch('/profiles?user_id=eq.' + encodeURIComponent(userId) + '&select=user_id,display_name,bio');
+  return (rows && rows[0]) || null;
+}
+
 runtime.community = {
   COMMUNITY_RELEASE_FORMAT_VERSION,
   buildRelease,
@@ -4929,6 +5074,9 @@ runtime.community = {
   startRemixFromRelease,
   validateReleaseShape,
   buildCommunityCard,
+  getRelease: communityGetRelease,
+  getChildren: communityGetChildren,
+  getProfile: communityGetProfile,
   get current(){ return __currentRelease; }
 };
 
@@ -5008,6 +5156,8 @@ const WorkshopController = (() => {
   let communityReleaseNote = '';
   let communityFeedback = null;      // {kind:'ok'|'error', message} for the last Publish/Open Release attempt
   let communityPendingImport = null; // parsed, validated .vrelease awaiting confirmation
+  let communityRemoteIdInput = '';   // remote Release id text field, for the "Open Community Release" (remote fetch) action
+  let communityRemoteFetching = false;
   let __lastPublishedReleasePreview = null; // {title} of the last successful publish THIS session, for the preview's parent-attribution line only (the REAL parent resolution for the actual release object lives in runtime.community.buildRelease itself)
 
   function esc(s){ return String(s); } // reminder: use textContent/value, never innerHTML, for any of this
@@ -6085,6 +6235,11 @@ const WorkshopController = (() => {
     if(code === 'RELEASE_SESSION_NOT_CLEAN') return t('community.sessionNotClean');
     if(code === 'RELEASE_MOD_ACTIVATION_FAILED') return t('distribution.packageModNotEligible', {id: e.id});
     if(code === 'RELEASE_PARSE_ERROR') return t('distribution.packageParseError');
+    if(code === 'COMMUNITY_NOT_CONFIGURED') return t('community.remoteNotConfigured');
+    if(code === 'COMMUNITY_NETWORK_ERROR') return t('community.remoteNetworkError');
+    if(code === 'COMMUNITY_RELEASE_NOT_FOUND') return t('community.remoteNotFound');
+    if(code === 'COMMUNITY_RELEASE_WITHDRAWN') return t('community.remoteNotFound');
+    if(code === 'COMMUNITY_PERMISSION_DENIED') return t('community.remotePermissionDenied');
     return (e && e.message) || t('distribution.somethingWentWrong');
   }
 
@@ -6303,6 +6458,46 @@ const WorkshopController = (() => {
       const file = e.dataTransfer.files && e.dataTransfer.files[0];
       if(file) handleFile(file);
     });
+
+    // Remote fetch by Community Release id (Runtime 0.2 Community
+    // Backend). This is the ONLY network call this Runtime page ever
+    // makes -- an anonymous, public read via runtime.community.getRelease
+    // -- and it feeds the exact same communityPendingImport preview /
+    // trust-warning / openRelease() / Start Remix pipeline as a local
+    // .vrelease file drop, above. No new Mod loader, no auto-execution.
+    const remoteWrap = document.createElement('div'); remoteWrap.className = 'ws-card'; remoteWrap.style.marginTop = '10px';
+    const remoteLabel = document.createElement('label'); remoteLabel.className = 'ws-label'; remoteLabel.textContent = t('community.remoteOpen'); remoteLabel.htmlFor = 'wsRemoteReleaseIdInput';
+    remoteWrap.appendChild(remoteLabel);
+    const remoteHint = document.createElement('p'); remoteHint.className = 'ws-hint'; remoteHint.textContent = t('community.remoteOpenHint');
+    remoteWrap.appendChild(remoteHint);
+    const remoteRow = document.createElement('div'); remoteRow.className = 'ws-btn-row';
+    const remoteInput = document.createElement('input');
+    remoteInput.type = 'text'; remoteInput.id = 'wsRemoteReleaseIdInput'; remoteInput.name = 'wsRemoteReleaseIdInput';
+    remoteInput.className = 'ws-textarea'; remoteInput.style.minHeight = 'unset';
+    remoteInput.placeholder = t('community.remoteIdLabel');
+    remoteInput.value = communityRemoteIdInput;
+    remoteInput.addEventListener('input', () => { communityRemoteIdInput = remoteInput.value; });
+    const remoteFetchBtn = document.createElement('button');
+    remoteFetchBtn.className = 'ws-btn'; remoteFetchBtn.disabled = communityRemoteFetching;
+    remoteFetchBtn.textContent = communityRemoteFetching ? t('community.remoteFetching') : t('community.remoteFetchButton');
+    remoteFetchBtn.addEventListener('click', async () => {
+      const remoteId = communityRemoteIdInput.trim();
+      if(!remoteId) return;
+      communityFeedback = null;
+      communityRemoteFetching = true;
+      render();
+      try {
+        const rel = await runtime.community.getRelease(remoteId);
+        communityPendingImport = rel;
+      } catch(e){
+        communityFeedback = {kind:'error', message: humanizeReleaseError(e)};
+      }
+      communityRemoteFetching = false;
+      render();
+    });
+    remoteRow.appendChild(remoteInput); remoteRow.appendChild(remoteFetchBtn);
+    remoteWrap.appendChild(remoteRow);
+    wrap.appendChild(remoteWrap);
 
     return wrap;
   }

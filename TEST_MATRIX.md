@@ -414,3 +414,33 @@ rejected (`RELEASE_VALIDATION_FAILED`) before any activation, current
 session unaffected ✅; dirty-session rejection (`RELEASE_SESSION_NOT_CLEAN`)
 ✅; `.vgame`/Bake remain history-free by construction (Release building
 reads nothing from RevisionHistoryStore).
+
+## Runtime 0.2 — Community Backend Foundation results
+
+Full results: `COMMUNITY_BACKEND_SPEC.md` § 12. All run live against the
+actual linked Supabase project, a real deployed Edge Function, and a real
+`file://` Runtime session. Summary: schema migration applies cleanly ✅;
+Security/Performance Advisor clean after one follow-up fix migration
+(0 WARN/ERROR, only expected `unused_index` INFO noise) ✅; sign-up →
+profile → publish → my-releases → view-by-id full loop via the real
+Portal + backend ✅; hostile content (`<script>alert(1)</script>`,
+quotes) rendered as literal text in the Portal preview and My-Releases
+list, never executed ✅; parent-forgery (client `generation:999`)
+silently ignored, server recorded the true `parent.generation+1` ✅; User
+B direct-REST attacks against User A's release (unpublish, retitle,
+`creator_id` forgery) all blocked (RLS-filtered zero-row updates / 403
+`42501`) ✅; fully anonymous (no `Authorization` header) publish/
+profile-edit/unpublish/Edge-Function attempts all blocked ✅; real
+`file://` Runtime → `runtime.community.getRelease` → preview (reusing the
+existing `communityPendingImport`/trust-notice/Open pipeline) → Mod
+activated ✅; flagship A→B remote lineage (Runtime fetch A → Start Remix →
+local `.vrelease` B export with correct `communityParentReleaseId` →
+Portal publish B → live DB row: `B.parent_release_id === A.id`,
+`B.generation === A.generation + 1`) ✅; unpublish by the real owner via
+the Portal UI → row flips `is_published:false` → subsequent anonymous
+read returns zero rows ✅; i18n catalog parity (`?dev=1` audit) after all
+additions ✅; entire test pass conducted live in zh-CN ✅; secret scan of
+`index.html`/`community.html`/`supabase/migrations`/`supabase/functions`
+for service-role/secret key patterns — zero matches ✅. 3+ Mod Release
+round-trip covered by construction, not re-run as a dedicated pass (the
+publish RPC's mod-index insert has no mod-count-specific code path).
