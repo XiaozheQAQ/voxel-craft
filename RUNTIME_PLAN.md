@@ -424,6 +424,25 @@ Likes/comments/ratings/follows/notifications/ranking/recommendation/a
 moderation dashboard/public Mod sandboxing remain explicitly out of
 scope and not started.
 
+## Runtime 0.2 — Community Trust Gate MVP (checkpoint reached)
+
+Made Community safe enough for public Beta by preventing remote
+Community JavaScript from executing in the same realm, without building
+a real sandbox. Two internal-only trust tiers (`TRUST_LOCAL`/
+`TRUST_COMMUNITY_REMOTE`, never `api.*`); a centralized
+`assertLocalTrust()` gate at the top of `openRelease()`/
+`startRemixFromRelease()` -- the only two paths that reach
+`captureDefinition()`/`new Function` for a Release. A community-remote
+Release now gets a metadata-only preview (Download/Back) instead of
+Open/Start Remix. Local `.vmod`/`.vrelease`/`.vwork`/`.vgame` flows
+unchanged. Verified live with a real hostile Mod (localStorage/DOM/
+navigation/fetch/throw/infinite-loop attempts) via the real
+`?communityRelease=` handoff: zero execution. `RUNTIME_VERSION` remains
+`0.2.0-dev`; no API/format changes. Full design:
+`TRUST_MODEL.md`. A real sandbox (iframe/Worker RPC) remains explicit
+future work, not started.
+
 ## STOP — likes/comments/ratings, follows, notifications, ranking/
-## recommendation, a moderation dashboard, and public Mod sandboxing
+## recommendation, a moderation dashboard, and a real sandbox
+## (iframe/Worker RPC, API 2, CSP redesign, code signing)
 ## remain explicitly out of scope for the next milestone.

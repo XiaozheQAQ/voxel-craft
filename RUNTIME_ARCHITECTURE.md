@@ -629,3 +629,16 @@ holds a Community Auth session. Everything else this milestone built
 (Explore, search, filters, Release/profile pages, pagination) lives
 entirely in `community.html`; `index.html`'s only other footprint is
 this one query-parameter check.
+
+## Runtime 0.2 — Community Trust Gate MVP
+
+A community-remote Release (`__trustTier === TRUST_COMMUNITY_REMOTE`,
+set only by `communityGetRelease()`) can no longer reach
+`openRelease()`/`startRemixFromRelease()` — both now call
+`assertLocalTrust(rel)` first-line, throwing before any Mod source is
+touched. Since `new Function` appears in exactly one place in this
+Runtime (`captureDefinition`, reached only via
+`ImportManager.importSource`, reached only via `openRelease()` for a
+Release), this closes the only path a remote Release's JS could reach
+execution. Local `.vmod`/`.vrelease`/`.vwork`/`.vgame` flows are
+untouched — they never carry `__trustTier`. See `TRUST_MODEL.md`.
