@@ -642,3 +642,19 @@ Runtime (`captureDefinition`, reached only via
 Release), this closes the only path a remote Release's JS could reach
 execution. Local `.vmod`/`.vrelease`/`.vwork`/`.vgame` flows are
 untouched — they never carry `__trustTier`. See `TRUST_MODEL.md`.
+
+## Runtime 0.2 — Public Beta Deployment
+
+No Runtime code changed this milestone — `index.html`'s
+`COMMUNITY_BACKEND_CONFIG` was already correctly minimal (project URL +
+publishable key only). The one deployment-critical fix was in
+`community.html`: its `runtimeBaseUrl` default (`'index.html'`, a
+relative path meant only for same-directory `file://` local dev) is now
+flagged in-file as something that **must** be edited to the Runtime's
+real absolute origin before a production deploy — left unedited, it
+silently resolves to the Portal's own origin instead of failing loudly,
+quietly defeating the origin-separation requirement documented above.
+Verified live under two genuinely distinct HTTP origins that the
+Runtime's storage stays empty and its one network request carries no
+Authorization header after a full cross-origin handoff. Full
+deployment architecture, config, and verification: `PUBLIC_BETA_DEPLOYMENT.md`.

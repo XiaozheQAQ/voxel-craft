@@ -442,7 +442,29 @@ navigation/fetch/throw/infinite-loop attempts) via the real
 `TRUST_MODEL.md`. A real sandbox (iframe/Worker RPC) remains explicit
 future work, not started.
 
+## Runtime 0.2 — Public Beta Deployment (checkpoint reached)
+
+Made the existing Community Beta actually deployable as two real
+origins. Fixed the one deployment-critical hardcode
+(`community.html`'s `runtimeBaseUrl` defaulted to a relative path that
+would silently resolve to the Portal's own origin in production --
+now flagged in-file, documented in `PUBLIC_BETA_DEPLOYMENT.md`).
+Verified live, under genuinely separate origins (not `file://`, not
+two paths on one origin): cross-origin Explore/sign-in/publish/remote-
+fetch all work against the real Supabase project with no CORS changes
+needed; the Runtime origin's storage was empty and its one network
+request carried no Authorization header after a full handoff --
+inspected directly. Added a provider-neutral `_headers` file
+(nosniff/Referrer-Policy/Permissions-Policy, no-cache on both HTML
+entry points); CSP explicitly deferred, not silently skipped. The
+linked Supabase project remains documented as a dev project, not
+relabeled production -- a real production project is a pre-launch
+decision left to the project owner, with exact migration steps
+documented. `RUNTIME_VERSION` remains `0.2.0-dev`; no schema/format
+changes. Full details: `PUBLIC_BETA_DEPLOYMENT.md`.
+
 ## STOP — likes/comments/ratings, follows, notifications, ranking/
-## recommendation, a moderation dashboard, and a real sandbox
-## (iframe/Worker RPC, API 2, CSP redesign, code signing)
-## remain explicitly out of scope for the next milestone.
+## recommendation, a moderation dashboard, a real sandbox (iframe/
+## Worker RPC, API 2, CSP redesign, code signing), and provisioning a
+## real production Supabase project remain explicitly out of scope /
+## deferred for the next milestone or an explicit owner decision.

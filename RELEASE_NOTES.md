@@ -9,6 +9,27 @@ Voxel Creation Workspace Format 1 — one additive field
 Voxel Community Release Format 1 — one additive field
 ```
 
+## Runtime 0.2.0-dev — Public Beta Deployment
+
+The Community Beta is now deployment-ready as two real, separate
+origins: an authenticated Community Portal (`community.html`) and an
+anonymous, execution-blocked Mod Runtime (`index.html`). Verified live
+against two genuinely distinct HTTP origins (standing in for
+`community.<domain>`/`play.<domain>`): cross-origin sign-in/publish/
+remote-fetch all work against the real Supabase project with no CORS
+weakening needed; the Runtime origin's storage was completely empty
+after a full "Open in Runtime" handoff, its URL carried only the
+Release id, and its one network request carried no `Authorization`
+header — inspected directly, not inferred. Added a static-host
+`_headers` file (nosniff/Referrer-Policy/Permissions-Policy + no-cache
+on both HTML entry points); CSP deliberately deferred (documented, not
+skipped — would require restructuring the inline-script Runtime). The
+linked Supabase project remains a **dev** project, not silently
+relabeled production — see `PUBLIC_BETA_DEPLOYMENT.md` for the explicit
+Option A/B decision. See `PUBLIC_BETA_DEPLOYMENT.md` for the full
+architecture, config, Supabase Auth URL requirements, smoke test, and
+rollback.
+
 ## Runtime 0.2.0-dev — Community Trust Gate MVP
 
 Community is now safe to deploy publicly: opening a Release fetched from
@@ -374,3 +395,6 @@ the same as you would any other executable.
   full phase-by-phase history, for anyone extending the Runtime itself.
 - `RELEASE_FIXTURES/` — example Mods, a demo project, a golden standalone
   game, and error-case fixtures, for reference or regression testing.
+- `TRUST_MODEL.md` — the two-tier local/community-remote trust gate.
+- `PUBLIC_BETA_DEPLOYMENT.md` — production architecture, config, Supabase
+  Auth URLs, deployment steps, smoke test, rollback.

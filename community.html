@@ -140,6 +140,14 @@
   // Same-origin proximity between them must never be relied upon for
   // security — see COMMUNITY_BACKEND_SPEC.md "Security architecture".
   // ===================================================================
+  // DEPLOYMENT: edit runtimeBaseUrl below before deploying to production
+  // -- see PUBLIC_BETA_DEPLOYMENT.md "Configuration". The relative
+  // 'index.html' default only makes sense for local file:// dev (both
+  // files in the same directory); left unedited in a real deployment it
+  // would resolve to this PORTAL's own origin (community.<domain>),
+  // silently defeating the origin-separation requirement instead of
+  // failing loudly. Set it to the Runtime's actual absolute origin, e.g.
+  // 'https://play.example.com/', before going live.
   const COMMUNITY_BACKEND_CONFIG = {
     enabled: true,
     supabaseUrl: 'https://gdfenseaqjhmaspsfpnq.supabase.co',
@@ -147,14 +155,15 @@
     // Runtime handoff target (spec § 63) -- the ONLY thing ever passed
     // across this boundary is a remote Release id, as
     // `?communityRelease=<uuid>`. Never a token. Configurable per
-    // deployment: production should point this at the Runtime's own
-    // origin (e.g. 'https://play.example.com/'), never this Portal's
-    // own origin. Defaults to a same-directory local index.html for
-    // file:///local-dev convenience -- see COMMUNITY_BACKEND_SETUP.md
-    // for the manual file:// handoff workflow when this default can't
-    // be auto-opened (browsers disallow script-initiated file:// window
-    // navigation from a non-file:// page).
-    runtimeBaseUrl: 'index.html'
+    // deployment: production MUST point this at the Runtime's own
+    // ABSOLUTE origin (e.g. 'https://play.example.com/'), never this
+    // Portal's own origin. Defaults to a same-directory local
+    // index.html for file:///local-dev convenience -- see
+    // COMMUNITY_BACKEND_SETUP.md for the manual file:// handoff
+    // workflow when this default can't be auto-opened (browsers
+    // disallow script-initiated file:// window navigation from a
+    // non-file:// page).
+    runtimeBaseUrl: 'https://voxel-craft-play.pages.dev/' // Public Beta -- Cloudflare Pages (voxel-craft-play project)
   };
 
   // Version metadata this Portal knows about, purely for the honest

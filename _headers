@@ -1,0 +1,36 @@
+# Static-host security/cache headers for Voxel Craft's public Beta.
+#
+# Format: Netlify / Cloudflare Pages `_headers` file syntax (no build
+# step required, picked up automatically by both hosts). If deploying
+# elsewhere (GitHub Pages, S3+CloudFront, a plain nginx/Apache static
+# host), translate these into that host's native header config -- see
+# PUBLIC_BETA_DEPLOYMENT.md "Security headers" for per-provider notes.
+#
+# Deploy this SAME file to both the Community origin and the Runtime
+# origin -- the header set below is safe and appropriate for either.
+#
+# Deliberately NO Content-Security-Policy here: this Runtime is a
+# single inline-<script>, no-build-step HTML file (by design -- see
+# RUNTIME_ARCHITECTURE.md). A CSP tight enough to matter (blocking
+# 'unsafe-inline'/'unsafe-eval') would break the Runtime's own inline
+# script and its Mod-execution model outright. Shipping a CSP here
+# would require restructuring the Runtime into external script files
+# first -- explicitly out of scope for this timeboxed deployment
+# milestone. Documented as a deferred item, not silently skipped.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+
+# index.html / community.html change on every deploy -- never let a
+# stale cached copy silently keep serving an old version (e.g. a
+# pre-Trust-Gate Runtime). Everything else in this repo (docs, SQL) is
+# not fetched by the deployed pages at runtime, so a short/no cache on
+# the HTML entry points is sufficient; no immutable/long-cache asset
+# tier exists yet since there is no separate built-asset pipeline.
+/index.html
+  Cache-Control: no-cache
+
+/community.html
+  Cache-Control: no-cache
