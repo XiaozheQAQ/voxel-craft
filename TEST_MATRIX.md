@@ -511,3 +511,24 @@ import still executes (`window.__regressionModRan===true` after a live
 drop) ✅; local Create/Export panels unaffected ✅; Community Explore
 loads clean (unchanged file) ✅; i18n audit in sync ✅; secret scan
 clean ✅.
+
+## Runtime 0.2 — Public Beta Deployment results
+
+Full results: `PUBLIC_BETA_DEPLOYMENT.md` § 10/11. Smoke test A-L run
+against two genuinely distinct local HTTP origins (`:4173` Community /
+`:4174` Runtime stand-ins) since no real domain exists yet: anonymous
+Explore ✅; search ✅; login ✅ (live cross-origin sign-in against the
+real Supabase project); publish ✅ (live cross-origin publish,
+`remoteId` returned); Release detail ✅; Open in Runtime crosses to a
+separate origin ✅ (`location.origin` differs before/after); Runtime
+receives only the release id ✅ (URL inspected); remote source remains
+blocked ✅ (metadata-only preview, 0 active mods); download works ✅;
+local Runtime boot clean ✅; zh-CN session throughout, en-US unaffected
+✅. Production security check (release blocker): Community-origin
+storage has the session, Runtime-origin storage is completely empty (0
+keys, enumerated not spot-checked), Runtime URL has no token, and the
+Runtime's one Supabase request has no `Authorization` header —
+confirmed by reading the actual raw request headers, not inferred ✅.
+CORS verified via `curl` with explicit `Origin` headers against both
+the REST API and the Edge Function — both origin-agnostic by design, no
+weakening needed ✅.
