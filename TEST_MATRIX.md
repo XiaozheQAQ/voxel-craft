@@ -494,3 +494,20 @@ regression ✅; `community.html` catalog parity (118/118, zero mismatch)
 verified via `scrollWidth`) ✅; offline/outage regression by construction
 ✅; Security/Performance Advisor clean after the new view (no
 `security_definer_view` finding) ✅.
+
+## Runtime 0.2 — Community Trust Gate MVP results
+
+Full results: `TRUST_MODEL.md`. Hostile-source test — published a real
+Community Release whose Mod's `setup()` attempted `localStorage.setItem`,
+`document.body.innerHTML` overwrite, `window.location` navigation, an
+external `fetch`, `throw new Error`, and `while(true){}`; opened it via
+the real `?communityRelease=` handoff against the live backend: zero
+`localStorage` keys written, DOM unchanged, URL unchanged, Runtime
+stayed responsive throughout, Mods count stayed 0 ✅. Gate reachability
+audit: `new Function` exists in exactly one place (`captureDefinition`),
+reached only via `openRelease()` for a Release, now gated first-line by
+`assertLocalTrust()` ✅. Regression: default boot clean ✅; local `.vmod`
+import still executes (`window.__regressionModRan===true` after a live
+drop) ✅; local Create/Export panels unaffected ✅; Community Explore
+loads clean (unchanged file) ✅; i18n audit in sync ✅; secret scan
+clean ✅.

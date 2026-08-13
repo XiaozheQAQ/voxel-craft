@@ -878,6 +878,9 @@ const I18N_MESSAGES = {
     'community.remoteNetworkError': 'Could not reach the Community backend. Check your connection and try again.',
     'community.remoteNotConfigured': 'The Community backend is not configured on this Runtime.',
     'community.remotePermissionDenied': 'You do not have permission to view that release.',
+    'community.remoteExecutionDisabled': 'Community code execution is not available yet. To protect your browser and local data, this Beta does not run JavaScript Mods from the Community directly. You can still view this release\'s information or download the .vrelease file.',
+    'community.back': 'Back',
+    'community.downloadRelease': 'Download .vrelease',
 
     'workshop.errors.loadFailedTitle': 'Mod could not be loaded',
     'workshop.errors.unknown': 'An unknown error occurred.',
@@ -1115,6 +1118,9 @@ const I18N_MESSAGES = {
     'community.remoteNetworkError': '无法连接到社区后端，请检查网络后重试。',
     'community.remoteNotConfigured': '此 Runtime 尚未配置社区后端。',
     'community.remotePermissionDenied': '你没有权限查看该作品发布。',
+    'community.remoteExecutionDisabled': '社区代码执行暂未开放。为保护你的浏览器和本地数据，当前 Beta 不会直接运行来自社区的 JavaScript 模组。你仍可以查看作品信息或下载 .vrelease 文件。',
+    'community.back': '返回',
+    'community.downloadRelease': '下载 .vrelease',
 
     'workshop.errors.loadFailedTitle': '模组无法加载',
     'workshop.errors.unknown': '发生未知错误。',
@@ -4914,6 +4920,7 @@ function exportRelease(rel){
    near-atomic on any Mod activation failure, same policy as
    importWorkspace. */
 function openRelease(rel){
+  assertLocalTrust(rel); // Trust Gate MVP: must be checked BEFORE anything else -- see TRUST_MODEL.md
   validateReleaseShape(rel);
   const dirty = ImportManager.listImports().some(r => ModHost.isActive(r.id));
   if(dirty) throw regError('RELEASE_SESSION_NOT_CLEAN', rel.game && rel.game.title, {hint: 'Reload the Runtime, then open this release into a fresh session.'});
@@ -4944,6 +4951,7 @@ function openRelease(rel){
    known, so the new Workspace's generation genuinely continues the
    chain instead of resetting to 0 -- see startRemixWorkspace's opts. */
 function startRemixFromRelease(rel){
+  assertLocalTrust(rel); // Trust Gate MVP: Remix depends on the Release's Mods already being active/retained via openRelease(), which is itself blocked for community-remote -- so this is unreachable for a remote Release either way, but gated explicitly for defense-in-depth and a clear error rather than a confusing downstream failure.
   return runtime.workspace.startRemixWorkspace('release', rel.game.title, {
     parentReleaseId: rel.releaseId, parentGeneration: rel.provenance.generation,
     // Only set when `rel` was fetched from the Community backend (see
@@ -5034,6 +5042,40 @@ async function communityAnonFetch(path){
    communityPendingImport preview / runtime.community.openRelease /
    trust-warning / Start Remix pipeline a local .vrelease already uses
    -- there is no second, remote-specific Mod loader anywhere. */
+/* =========================================================
+   Runtime 0.2 — Community Trust Gate MVP.
+
+   Internal-only trust/source classification -- NOT exposed as api.*,
+   never a new permission, never an API/format version change. Every
+   Release object handled by this Runtime carries one of these two
+   tiers, tagged at the point it enters the Runtime:
+
+   - TRUST_LOCAL: parsed directly from a user-selected local file
+     (.vmod/.vrelease/.vwork/.vgame drop-zone) -- same-realm trusted
+     execution, unchanged, exactly as before this milestone. The
+     player chose this file; they assume the risk, same as running any
+     other local executable.
+   - TRUST_COMMUNITY_REMOTE: fetched anonymously from the Community
+     backend (communityGetRelease). This Runtime has no relationship
+     with whoever published it. Its JS must never reach
+     captureDefinition()/new Function/eval/setup() in this milestone --
+     there is no sandbox yet, so the only safe thing to do with
+     untrusted remote code is not run it.
+
+   The gate is centralized in assertLocalTrust(), called at the very
+   top of every function that would otherwise execute Mod source
+   (openRelease, startRemixFromRelease) -- not scattered as UI-only
+   checks that a different code path could bypass. See TRUST_MODEL.md.
+   ========================================================= */
+const TRUST_LOCAL = 'local';
+const TRUST_COMMUNITY_REMOTE = 'community-remote';
+
+function assertLocalTrust(rel){
+  if(rel && rel.__trustTier === TRUST_COMMUNITY_REMOTE){
+    throw regError('RELEASE_REMOTE_EXECUTION_BLOCKED', (rel.game && rel.game.title) || rel.__communityRemoteId);
+  }
+}
+
 async function communityGetRelease(remoteId){
   if(!remoteId || typeof remoteId !== 'string') throw regError('COMMUNITY_RELEASE_NOT_FOUND', String(remoteId));
   const rows = await communityAnonFetch('/community_releases?id=eq.' + encodeURIComponent(remoteId) + '&select=id,is_published,snapshot_text');
@@ -5048,6 +5090,8 @@ async function communityGetRelease(remoteId){
   try { release = JSON.parse(row.snapshot_text); }
   catch(e){ throw regError('COMMUNITY_RELEASE_NOT_FOUND', remoteId); }
   release.__communityRemoteId = row.id; // informational only, not part of Release Format 1
+  release.__snapshotText = row.snapshot_text; // exact bytes, for Download without re-serializing
+  release.__trustTier = TRUST_COMMUNITY_REMOTE; // this Release entered the Runtime via an anonymous remote fetch -- never same-realm-executable this milestone
   return release;
 }
 
@@ -6240,6 +6284,7 @@ const WorkshopController = (() => {
     if(code === 'COMMUNITY_RELEASE_NOT_FOUND') return t('community.remoteNotFound');
     if(code === 'COMMUNITY_RELEASE_WITHDRAWN') return t('community.remoteNotFound');
     if(code === 'COMMUNITY_PERMISSION_DENIED') return t('community.remotePermissionDenied');
+    if(code === 'RELEASE_REMOTE_EXECUTION_BLOCKED') return t('community.remoteExecutionDisabled');
     return (e && e.message) || t('distribution.somethingWentWrong');
   }
 
@@ -6378,6 +6423,31 @@ const WorkshopController = (() => {
 
     if(communityPendingImport){
       const rel = communityPendingImport;
+
+      // Trust Gate MVP: a community-remote Release NEVER gets the
+      // Cancel/Open confirmation -- there is no "Open" affordance for
+      // it at all this milestone. Metadata-only preview + Download +
+      // Back. See TRUST_MODEL.md.
+      if(rel.__trustTier === TRUST_COMMUNITY_REMOTE){
+        const card = buildCommunityCardEl(rel);
+        const notice = document.createElement('div'); notice.className = 'ws-trust-notice';
+        notice.textContent = t('community.remoteExecutionDisabled');
+        card.appendChild(notice);
+
+        const row = document.createElement('div'); row.className = 'ws-btn-row';
+        const backBtn = document.createElement('button'); backBtn.className = 'ws-btn ws-btn-ghost'; backBtn.textContent = t('community.back');
+        backBtn.addEventListener('click', () => { communityPendingImport = null; render(); });
+        const downloadBtn = document.createElement('button'); downloadBtn.className = 'ws-btn'; downloadBtn.textContent = t('community.downloadRelease');
+        downloadBtn.addEventListener('click', () => {
+          const text = rel.__snapshotText || JSON.stringify(rel, null, 2);
+          downloadBlob(new Blob([text], {type: 'application/json'}), sanitizeFilename(rel.game.title) + '.vrelease');
+        });
+        row.appendChild(backBtn); row.appendChild(downloadBtn);
+        card.appendChild(row);
+        wrap.appendChild(card);
+        return wrap;
+      }
+
       const card = buildCommunityCardEl(rel);
       const row = document.createElement('div'); row.className = 'ws-btn-row';
       const cancelBtn = document.createElement('button'); cancelBtn.className = 'ws-btn ws-btn-ghost'; cancelBtn.textContent = t('common.cancel');

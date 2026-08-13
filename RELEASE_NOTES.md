@@ -9,6 +9,21 @@ Voxel Creation Workspace Format 1 — one additive field
 Voxel Community Release Format 1 — one additive field
 ```
 
+## Runtime 0.2.0-dev — Community Trust Gate MVP
+
+Community is now safe to deploy publicly: opening a Release fetched from
+the Community backend no longer executes its Mod source. Browsing,
+search, filters, Release/profile pages, lineage, and `.vrelease`
+download are unaffected; only "Open"/"Start Remix" for a **remote**
+Release is replaced with a metadata-only preview, a plain-language
+notice ("Community code execution is not available yet…" — never
+"safe"/"sandboxed"/"verified"), and Download/Back buttons. Local
+`.vmod`/`.vrelease`/`.vwork`/`.vgame` files you choose yourself remain
+fully trusted and unchanged. Verified live with a real published Release
+whose Mod attempted `localStorage` writes, DOM overwrite, navigation, an
+external `fetch`, and an infinite loop — none of it ran. See
+`TRUST_MODEL.md`.
+
 ## Runtime 0.2.0-dev — Community Discovery & Release Pages
 
 Community is now browsable and shareable without signing in: an Explore

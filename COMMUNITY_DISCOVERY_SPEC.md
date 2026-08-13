@@ -368,3 +368,13 @@ mocked.
   repository going forward.
 - No SSR/OpenGraph/social-preview metadata — `document.title` is the
   only per-page metadata this milestone sets, as scoped.
+
+## 14. Addendum — Community Trust Gate MVP
+
+Opening a community-remote Release via `?communityRelease=<uuid>` or the
+Workshop's manual remote-id fetch no longer offers "Open"/"Start Remix"
+at all — only a metadata-only preview, a security notice ("Community
+code execution is not available yet…"), **Download .vrelease**, and
+**Back**. This closes the gap where § 10's handoff correctly carried no
+token but the Runtime would still execute the fetched Release's Mod
+source on explicit confirm. Full design: `TRUST_MODEL.md`.
