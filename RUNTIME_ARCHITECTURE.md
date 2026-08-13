@@ -575,8 +575,22 @@ This is deliberately the Runtime's *only* change this milestone besides
 the matching `communityParentReleaseId` provenance field (see
 `COMMUNITY_RELEASE_SPEC.md`'s addendum). All Auth/publish/profile/manage
 surfaces live in a new, separate file, `community.html` — never inside
-`index.html`, and never sharing a session-storage key with it — because
-Mods execute as trusted, same-realm code inside `index.html` (see "The
-internal/public identity boundary" above): any Auth token present there
-would be reachable from Mod code. Full design, RLS matrix, and the
-security rationale: `COMMUNITY_BACKEND_SPEC.md`.
+`index.html` — because Mods execute as trusted, same-realm code inside
+`index.html` (see "The internal/public identity boundary" above): any
+Auth token present there would be reachable from Mod code.
+
+Being a separate *file* using a separate `localStorage` key is hygiene,
+not the security boundary — it does not, by itself, stop a Mod from
+reaching a Community session token. **The actual requirement is that
+`community.html` be deployed on a different *origin* than `index.html`**
+(e.g. `community.example.com` vs. `play.example.com`) whenever the
+Runtime also serves untrusted/third-party Mods: same-realm JavaScript
+running inside `index.html` can read any `localStorage` key and call any
+authenticated browser API available to whatever origin `index.html`
+happens to be served from, regardless of which file or key name a token
+is stored under. This Runtime never gives a Mod a *reason* to go looking
+(no token is ever placed in `index.html`'s storage in the first place),
+but that is a property of this Runtime's own code, not a substitute for
+origin separation in deployment — the two are complementary, and neither
+is claimed to be sufficient on its own. Full design, RLS matrix, and the
+security rationale: `COMMUNITY_BACKEND_SPEC.md` § 1.

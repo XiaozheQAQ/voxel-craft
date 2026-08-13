@@ -35,11 +35,24 @@ a Mod. Therefore:
   or evaluates untrusted JS** — Mod source is only ever displayed as
   read-only text (`textContent`, never `innerHTML`, never `eval`/`new
   Function`, never a dynamically-created `<script>` tag).
-- Production deployments are expected to host these two files on
-  **separate origins** (e.g. `community.example.com` vs.
-  `play.example.com`, or as two independently-opened local `file://`
-  URLs) — same-origin proximity between them is never relied upon for
-  security anywhere in this design.
+- **Hard requirement, not a recommendation: `community.html` MUST be
+  deployed on a different origin from `index.html` in any deployment
+  that also serves untrusted/third-party Mods.** Example:
+  `community.example.com` (authenticated Portal) vs. `play.example.com`
+  (Runtime + untrusted Mods). This is the actual security boundary —
+  everything else in this section (separate file, separate
+  `localStorage` key, no token in URL/postMessage) is defense-in-depth
+  *on top of* origin separation, never a substitute for it. **A
+  different filename and a different `localStorage` key are NOT security
+  isolation by themselves**: if the two pages ever end up served from the
+  same origin, a Mod running inside `index.html` can read any
+  `localStorage` key on that origin (including a Community session
+  token, however it's named) and call any authenticated browser API
+  available to that origin — same-realm JavaScript has no partition
+  between "the Runtime's own storage" and "some other page's storage" the
+  moment they share an origin. Same-origin proximity between the two
+  pages must never be relied upon for security anywhere this design is
+  deployed.
 - Access/refresh tokens are never transferred between the two pages by
   URL, `postMessage`, query parameter, clipboard, or shared `localStorage`
   key. `community.html` persists its own session under a Portal-specific
@@ -298,6 +311,20 @@ milestone. Neither format's version counter changes
 stay `1`); an older reader simply doesn't recognize the field and treats
 it as absent, exactly like every other additive field this Runtime has
 shipped.
+
+**Backward-compatibility audit (release-blocker check, re-verified before
+merge):** confirmed by code inspection that neither `validateWorkspaceShape()`
+nor `validateReleaseShape()` reference `communityParentReleaseId` at all
+— an older `.vwork`/`.vrelease` file lacking the field passes validation
+identically to one that has it. Every read site
+(`resolveReleaseParent()`, `startRemixWorkspace()`, `buildRelease()`)
+reads it as `x.communityParentReleaseId || null`, so a genuinely absent
+(`undefined`) value is treated exactly like an explicit `null` — no
+read site assumes the key exists. The Edge Function's own structural
+check likewise only validates the field's *type* when present
+(`!== undefined && !== null && typeof !== 'string'` → reject), never its
+presence. This confirms the field is safely optional end-to-end and that
+no Workspace/Release Format 2 was triggered or is needed.
 
 ```
 Workspace.provenance: {

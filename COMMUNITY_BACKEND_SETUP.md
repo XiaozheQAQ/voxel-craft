@@ -117,24 +117,42 @@ every Community feature fail gracefully with `COMMUNITY_NOT_CONFIGURED`
 without affecting any purely local Runtime feature — the Runtime never
 depends on the backend being present to boot or play.
 
-## 6. Production topology
+## 6. Production topology — hard requirement
 
-Deploy `community.html` and `index.html` to **separate origins** — this
-is a hard recommendation, not a suggestion, since the entire security
-model of this milestone rests on the Runtime never being able to observe
-a Community Auth token, and same-origin `localStorage`/DOM access would
-undermine that if the two files shared an origin. A typical setup:
+**`community.html` MUST be deployed on a different origin than
+`index.html`** whenever the Runtime also serves untrusted/third-party
+Mods. This is not a best-practice suggestion — it is the actual security
+boundary this whole milestone depends on. A typical setup:
 
 ```
 community.example.com  → community.html  (Community Portal, owns Auth)
-play.example.com       → index.html      (Runtime, anonymous Community consumer)
+play.example.com       → index.html      (Runtime, anonymous Community consumer + untrusted Mods)
 ```
 
-For local testing, opening each file directly via `file://` already
-gives you origin-level isolation in most browsers (each `file://` URL is
-treated as a unique origin) — this is why the live testing for this
-milestone was conducted with both files open as separate `file://` tabs
-without any special server setup.
+**A different filename, and `community.html` using a different
+`localStorage` key than `index.html`, are NOT security isolation.** They
+are hygiene on top of the real boundary, not a substitute for it. If the
+two pages are ever served from the same origin, a Mod running inside
+`index.html` — trusted, same-realm JavaScript with no sandbox (see
+`RUNTIME_ARCHITECTURE.md`'s Trust model) — can read *any* `localStorage`
+key on that origin and call *any* authenticated browser API available to
+it, including whatever a Community session happens to be stored under,
+regardless of which file wrote it. Do not deploy the two files under the
+same origin and rely on "it's a different file" or "it's a different
+storage key" to keep a Mod away from an authenticated session — it will
+not.
+
+**On `file://` isolation for local testing**: this milestone's live
+testing was conducted by opening `index.html` and `community.html` as
+two separate `file://` tabs, and in the browser used for that testing
+each `file://` URL was isolated as its own origin. This is convenient
+for local development but is a **browser-implementation detail, not a
+guaranteed or standardized isolation mechanism** — different browsers
+and configurations have historically treated `file://` origin isolation
+differently. Do not treat `file://` opening as a substitute for real
+origin separation in any deployment that isn't purely local, single-user
+testing; use the `community.example.com`/`play.example.com`-style split
+above for anything real.
 
 ## 7. Row Level Security is not optional
 

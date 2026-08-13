@@ -1047,6 +1047,7 @@ remote round-trip (real fetch -> Start Remix -> local `.vrelease` export
 -> Portal publish -> live DB row with correct `generation`/
 `parent_release_id`), and a complete zh-CN pass. `API_VERSION`/
 `VMP_VERSION`/`GAME_PACKAGE_FORMAT_VERSION` remain unchanged -- nothing
-here is `api.*`. `RUNTIME_VERSION` is `0.2` for this milestone. Full
-design, schema, RLS matrix, and acceptance-test results:
+here is `api.*`. `RUNTIME_VERSION` remains `0.2.0-dev` -- this milestone
+is not a stable 0.2 release. Full design, schema, RLS matrix, and
+acceptance-test results:
 `COMMUNITY_BACKEND_SPEC.md` / `COMMUNITY_BACKEND_SETUP.md`.

@@ -1,7 +1,7 @@
 # Voxel Craft — Runtime Release Notes
 
 ```
-Runtime 0.2 — Community Backend Foundation
+Runtime 0.2.0-dev
 API 1 — frozen
 VMP 1 — frozen
 Voxel Game Package Format 1 — frozen
@@ -9,7 +9,11 @@ Voxel Creation Workspace Format 1 — one additive field
 Voxel Community Release Format 1 — one additive field
 ```
 
-## Runtime 0.2 — Community Backend Foundation
+## Runtime 0.2.0-dev — Community Backend Foundation
+
+Not yet declared stable — `RUNTIME_VERSION` remains `0.2.0-dev` for this
+milestone; this is a checkpoint within the 0.2 development line, not a
+0.2 release.
 
 Community Releases can now be persisted to a real backend (Supabase) and
 fetched back into the Runtime by anyone — while the Runtime itself still
