@@ -367,3 +367,30 @@ remain unaffected.
 
 Community backend/accounts/auth/marketplace/remote upload/browsing/likes/
 comments/ratings remain explicitly out of scope and not started.
+
+## Runtime 0.2 — Community Backend Foundation (checkpoint reached)
+
+Persisted Community Releases remotely (Supabase: Postgres + RLS + one
+Edge Function) while preserving the Runtime's core security boundary:
+`index.html` never holds a Community Auth session — a new, separate file,
+`community.html`, owns all identity/Auth/publish/manage UI, and never
+executes Mod source. The Runtime gained exactly one new capability
+(`runtime.community.getRelease`/`getChildren`/`getProfile`, anonymous
+public reads only, feeding the *existing* Open Release/Start Remix
+pipeline) and one new Workshop UI surface ("Open Community Release
+(remote)"). Verified live against the actual linked project: schema
+migration applies cleanly, Security/Performance Advisor clean, two-user
+RLS attack tests (cross-user unpublish/retitle/creator-forgery, fully
+anonymous write attempts) all correctly blocked, server-computed
+remix lineage (forged `generation` silently ignored), a full A→B remote
+lineage round-trip via the real fetch→remix→publish loop, hostile-content
+round-trip, and a complete zh-CN pass. Marketplace browsing/discovery/
+likes/comments/moderation/recommendations remain explicitly out of scope
+and not started — see `COMMUNITY_BACKEND_SPEC.md` § 14. `RUNTIME_VERSION`
+is `0.2` for this milestone; API 1 / VMP 1 / Package Format 1 remain
+frozen; Workspace Format 1 / Community Release Format 1 each gained one
+additive, optional field (`communityParentReleaseId`) with no version
+bump.
+
+## STOP — Marketplace discovery UI, likes/comments/ratings, moderation,
+## recommendations remain explicitly out of scope for the next milestone.

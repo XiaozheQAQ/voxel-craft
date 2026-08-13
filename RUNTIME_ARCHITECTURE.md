@@ -551,3 +551,32 @@ Release back into a Game-Package-shaped object so the unmodified
 opening a Release — no second packaging engine. `.vwork`'s `provenance`
 gained one optional field (`parentReleaseId`) to support Release-derived
 Workspaces without a format bump. Full design: `COMMUNITY_RELEASE_SPEC.md`.
+
+## Runtime 0.2 — Community Backend Foundation
+
+`runtime.community` gains three anonymous-only remote methods —
+`getRelease(remoteId)`, `getChildren(remoteId)`, `getProfile(userId)` —
+implemented as plain `fetch()` calls against a Supabase project's REST
+API using only a client-safe publishable key
+(`COMMUNITY_BACKEND_CONFIG`). **There is no login/session/token method on
+this object, and none should ever be added** — this Runtime module is,
+and must remain, an anonymous Community *consumer* only. `getRelease`
+reconstructs the exact original `.vrelease` object from the fetched row's
+verbatim `snapshot_text` (never re-derived from normalized columns), so
+it slots into the *same* `communityPendingImport` preview/
+`openRelease()`/Start Remix pipeline a locally-dropped `.vrelease` file
+already used — no second Mod-loading path was introduced. None of these
+methods run at load time; every one is reachable only from the new
+"Open Community Release (remote)" Workshop button, so a missing or
+unreachable backend can never block booting or playing purely local
+content.
+
+This is deliberately the Runtime's *only* change this milestone besides
+the matching `communityParentReleaseId` provenance field (see
+`COMMUNITY_RELEASE_SPEC.md`'s addendum). All Auth/publish/profile/manage
+surfaces live in a new, separate file, `community.html` — never inside
+`index.html`, and never sharing a session-storage key with it — because
+Mods execute as trusted, same-realm code inside `index.html` (see "The
+internal/public identity boundary" above): any Auth token present there
+would be reachable from Mod code. Full design, RLS matrix, and the
+security rationale: `COMMUNITY_BACKEND_SPEC.md`.

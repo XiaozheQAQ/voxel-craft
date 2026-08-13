@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxel Craft — Community Portal</title>
+<style>
+  :root{
+    --bg:#14161c; --panel:#1c1f28; --panel2:#232733; --border:#333846;
+    --text:#e8eaf0; --muted:#9099ac; --accent:#5b8def; --accent2:#3f6fce;
+    --danger:#e3584f; --danger2:#c8433b; --ok:#4caf7d; --warn:#d8a33e;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--panel);position:sticky;top:0;z-index:10;}
+  header h1{font-size:17px;margin:0;font-weight:600;}
+  header .sub{color:var(--muted);font-size:12px;margin-top:2px;}
+  nav{display:flex;gap:6px;flex-wrap:wrap;}
+  nav button{background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:6px;cursor:pointer;font-size:13px;}
+  nav button.active{background:var(--accent);border-color:var(--accent);}
+  nav button:hover{border-color:var(--accent);}
+  .top-actions{display:flex;align-items:center;gap:10px;}
+  select.lang{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;}
+  main{max-width:920px;margin:0 auto;padding:24px 20px 80px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:18px;}
+  .panel h2{margin-top:0;font-size:15px;}
+  label.field-label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px;}
+  input[type=text],input[type=email],input[type=password],textarea{
+    width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:6px;padding:9px 10px;font-size:13px;font-family:inherit;
+  }
+  textarea{resize:vertical;min-height:70px;}
+  button.btn{background:var(--accent);border:1px solid var(--accent);color:#fff;padding:9px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;}
+  button.btn:hover{background:var(--accent2);}
+  button.btn.secondary{background:transparent;color:var(--text);border-color:var(--border);}
+  button.btn.danger{background:var(--danger);border-color:var(--danger);}
+  button.btn.danger:hover{background:var(--danger2);}
+  button.btn:disabled{opacity:.5;cursor:not-allowed;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .msg{padding:10px 12px;border-radius:6px;font-size:13px;margin:10px 0;}
+  .msg.error{background:rgba(227,88,79,.15);border:1px solid var(--danger);color:#ffb3ae;}
+  .msg.ok{background:rgba(76,175,125,.15);border:1px solid var(--ok);color:#9fe3bf;}
+  .msg.warn{background:rgba(216,163,62,.15);border:1px solid var(--warn);color:#f0cb84;}
+  .msg.info{background:rgba(91,141,239,.15);border:1px solid var(--accent);color:#b9d0fb;}
+  .hidden{display:none !important;}
+  .trust-notice{background:rgba(216,163,62,.12);border:1px solid var(--warn);color:#f0cb84;padding:10px 12px;border-radius:6px;font-size:13px;margin:12px 0;}
+  .card{border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;background:var(--panel2);}
+  .card h3{margin:0 0 6px;font-size:14px;}
+  .card .meta-line{font-size:12px;color:var(--muted);margin:2px 0;}
+  .badge{display:inline-block;font-size:11px;padding:2px 7px;border-radius:10px;border:1px solid var(--border);color:var(--muted);margin-left:6px;}
+  .badge.published{color:var(--ok);border-color:var(--ok);}
+  .badge.withdrawn{color:var(--danger);border-color:var(--danger);}
+  pre.src-view{max-height:220px;overflow:auto;background:#0f1116;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px;white-space:pre-wrap;word-break:break-word;}
+  .mod-item{border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:6px;background:#0f1116;}
+  .mod-item .mid{font-size:12px;color:var(--muted);}
+  .mono{font-family:ui-monospace,Consolas,monospace;}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .small{font-size:12px;color:var(--muted);}
+  .divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
+  .center{text-align:center;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 id="hTitle">Voxel Craft — Community Portal</h1>
+    <div class="sub" id="hSub">Publish, sign in, and manage your Community Releases.</div>
+  </div>
+  <div class="top-actions">
+    <nav id="navBar"></nav>
+    <select class="lang" id="langSelect">
+      <option value="en-US">English</option>
+      <option value="zh-CN">简体中文</option>
+    </select>
+  </div>
+</header>
+
+<main id="mainRoot"></main>
+
+<script>
+(function(){
+  'use strict';
+
+  // ===================================================================
+  // COMMUNITY_BACKEND_CONFIG — the ONLY Community credentials this page
+  // (or index.html) is ever allowed to contain. `publishableKey` is
+  // meant to be public/client-safe (the sb_publishable_... key, or the
+  // legacy `anon` key on older projects) — it identifies the project to
+  // Supabase's API gateway; it grants no privilege by itself, since
+  // every table/RPC in this project requires RLS + auth.uid() to permit
+  // anything. NEVER put a secret/service-role key here.
+  //
+  // Production deployment note: this file (identity/Auth owner) and
+  // index.html (anonymous Mod-execution Runtime) are meant to be
+  // hosted on SEPARATE origins (e.g. community.example.com vs
+  // play.example.com, or opened locally as two separate file:// URLs).
+  // Same-origin proximity between them must never be relied upon for
+  // security — see COMMUNITY_BACKEND_SPEC.md "Security architecture".
+  // ===================================================================
+  const COMMUNITY_BACKEND_CONFIG = {
+    enabled: true,
+    supabaseUrl: 'https://gdfenseaqjhmaspsfpnq.supabase.co',
+    publishableKey: 'sb_publishable_oR6a_j65kCvs6-En27i_vw_YWcNVqiU'
+  };
+
+  const SESSION_STORAGE_KEY = 'voxelcraft.community.portal.session.v1';
+  const MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024;
+  const MAX_MOD_COUNT = 32;
+  const MAX_MOD_SOURCE_BYTES = 256 * 1024;
+  const MAX_TITLE_LEN = 100;
+  const MAX_DESCRIPTION_LEN = 2000;
+  const MAX_RELEASE_NOTE_LEN = 1000;
+  const MAX_TAG_COUNT = 8;
+  const MAX_TAG_LEN = 32;
+
+  // ===================================================================
+  // i18n — self-contained catalog for this Portal only. Distinct from
+  // (and not sharing storage/keys with) the Runtime's own
+  // `runtime.i18n` catalog in index.html — these are two separate
+  // pages/files by design.
+  // ===================================================================
+  const CATALOG = {
+    'en-US': {
+      title: 'Voxel Craft — Community Portal',
+      subtitle: 'Publish, sign in, and manage your Community Releases.',
+      navAuth: 'Account', navProfile: 'Profile', navPublish: 'Publish', navMine: 'My Releases', navBrowse: 'View Release',
+      notConfigured: 'The Community backend is not configured on this page.',
+      networkError: 'Could not reach the Community backend. Check your connection and try again.',
+
+      signIn: 'Sign in', signUp: 'Create account', signOut: 'Sign out',
+      email: 'Email', password: 'Password',
+      signInBtn: 'Sign in', signUpBtn: 'Create account',
+      authRequired: 'Sign in to continue.',
+      authFailed: 'Sign-in failed. Check your email and password.',
+      signUpOk: 'Account created.',
+      confirmEmailNotice: 'Check your email to confirm your account, then sign in.',
+      signedInAs: 'Signed in as {email}',
+      alreadyHaveAccount: 'Already have an account?', needAccount: "Don't have an account?",
+
+      profileTitle: 'Public profile',
+      displayName: 'Display name', bio: 'Bio',
+      saveProfile: 'Save profile', profileSaved: 'Profile saved.',
+      profileInvalid: 'Display name is required (1–60 characters).',
+
+      publishTitle: 'Publish a Release',
+      publishHint: 'Upload a .vrelease file exported from the Runtime\'s "Publish Snapshot" action, review it below, then publish.',
+      chooseFile: 'Choose .vrelease file…',
+      previewTitle: 'Preview before publishing',
+      previewHistoryExcluded: 'Private Workspace history is not included.',
+      previewTrust: 'This preview only displays the file\'s text — it never executes Mod source. The Runtime itself is not sandboxed: only open/Bake releases you trust.',
+      original: 'Original Creation', remixOf: 'Remix of "{title}"',
+      modCount: '{count} mod(s)', publishBtn: 'Publish this Release',
+      publishing: 'Publishing…', publishOk: 'Published. Remote ID: {id}',
+      releaseInvalid: 'This file is not a valid Community Release, or exceeds a size/count limit.',
+
+      mineTitle: 'My Releases', mineEmpty: 'You have not published any Releases yet.',
+      copyId: 'Copy remote ID', copied: 'Copied.',
+      download: 'Download .vrelease', unpublish: 'Unpublish', unpublishConfirm: 'Withdraw this release from public listing? It stays associated with your account but is no longer publicly readable.',
+      unpublished: 'Unpublished.', published: 'Published', withdrawn: 'Withdrawn',
+      generationLabel: 'Generation {gen}', parentLabel: 'Parent: {id}',
+
+      browseTitle: 'View a Community Release', remoteIdLabel: 'Remote Release ID',
+      lookupBtn: 'Look up', notFound: 'That release could not be found, or is not public.',
+      permissionDenied: 'You do not have permission to do that.',
+      directParent: 'Direct parent', directRemixes: 'Direct remixes', none: 'None',
+      mods: 'Mods', tags: 'Tags', language: 'Language', releaseNote: 'Release note',
+
+      genericError: 'Something went wrong.',
+      loading: 'Loading…'
+    },
+    'zh-CN': {
+      title: 'Voxel Craft — 社区门户',
+      subtitle: '发布、登录并管理你的社区作品发布。',
+      navAuth: '账号', navProfile: '个人资料', navPublish: '发布', navMine: '我的发布', navBrowse: '查看作品',
+      notConfigured: '此页面尚未配置社区后端。',
+      networkError: '无法连接到社区后端，请检查网络后重试。',
+
+      signIn: '登录', signUp: '创建账号', signOut: '退出登录',
+      email: '邮箱', password: '密码',
+      signInBtn: '登录', signUpBtn: '创建账号',
+      authRequired: '请先登录。',
+      authFailed: '登录失败，请检查邮箱和密码。',
+      signUpOk: '账号已创建。',
+      confirmEmailNotice: '请查收邮件以确认账号，然后登录。',
+      signedInAs: '当前登录：{email}',
+      alreadyHaveAccount: '已有账号？', needAccount: '还没有账号？',
+
+      profileTitle: '公开资料',
+      displayName: '显示名称', bio: '简介',
+      saveProfile: '保存资料', profileSaved: '资料已保存。',
+      profileInvalid: '显示名称为必填项（1–60 个字符）。',
+
+      publishTitle: '发布作品',
+      publishHint: '上传通过 Runtime「发布快照」导出的 .vrelease 文件，在下方预览确认后发布。',
+      chooseFile: '选择 .vrelease 文件…',
+      previewTitle: '发布前预览',
+      previewHistoryExcluded: '不包含私人创作工作区历史。',
+      previewTrust: '此预览仅以文本形式展示文件内容 —— 不会执行其中的模组源码。Runtime 本身并非沙盒环境：请仅打开/烘焙你信任的作品发布。',
+      original: '原创作品', remixOf: '基于「{title}」的二次创作',
+      modCount: '{count} 个模组', publishBtn: '发布此作品',
+      publishing: '发布中…', publishOk: '发布成功，远程 ID：{id}',
+      releaseInvalid: '该文件不是有效的社区作品发布，或超出大小/数量限制。',
+
+      mineTitle: '我的发布', mineEmpty: '你还没有发布任何作品。',
+      copyId: '复制远程 ID', copied: '已复制。',
+      download: '下载 .vrelease', unpublish: '撤下发布', unpublishConfirm: '将此作品从公开列表中撤下？它仍与你的账号关联，但不再公开可读。',
+      unpublished: '已撤下。', published: '已发布', withdrawn: '已撤下',
+      generationLabel: '第 {gen} 代', parentLabel: '父级：{id}',
+
+      browseTitle: '查看社区作品发布', remoteIdLabel: '远程作品 ID',
+      lookupBtn: '查询', notFound: '未找到该作品，或该作品未公开。',
+      permissionDenied: '你没有权限执行此操作。',
+      directParent: '直接父级', directRemixes: '直接二次创作', none: '无',
+      mods: '模组', tags: '标签', language: '语言', releaseNote: '发布说明',
+
+      genericError: '发生错误。',
+      loading: '加载中…'
+    }
+  };
+
+  let locale = (navigator.language && CATALOG[navigator.language]) ? navigator.language : 'en-US';
+  function t(key, params){
+    let s = (CATALOG[locale] && CATALOG[locale][key]) || (CATALOG['en-US'][key]) || key;
+    if(params){ for(const k in params){ s = s.split('{'+k+'}').join(String(params[k])); } }
+    return s;
+  }
+
+  // ===================================================================
+  // Structured error codes. Shared code namespace with the Runtime's
+  // `runtime.community` client (COMMUNITY_BACKEND_SPEC.md § Error
+  // model) plus a small set of Portal-only additions for signup/profile
+  // UX that the anonymous-only Runtime client never needs.
+  // ===================================================================
+  const ERROR_MESSAGES = {
+    'en-US': {
+      COMMUNITY_NOT_CONFIGURED: 'The Community backend is not configured.',
+      COMMUNITY_NETWORK_ERROR: 'Could not reach the Community backend. Check your connection and try again.',
+      COMMUNITY_AUTH_REQUIRED: 'Sign in to continue.',
+      COMMUNITY_AUTH_FAILED: 'Sign-in failed. Check your email and password.',
+      COMMUNITY_RELEASE_NOT_FOUND: 'That release could not be found.',
+      COMMUNITY_RELEASE_WITHDRAWN: 'That release has been withdrawn by its creator.',
+      COMMUNITY_PUBLISH_FAILED: 'Publishing failed. Please try again.',
+      COMMUNITY_RELEASE_INVALID: 'This file is not a valid Community Release, or exceeds a size/count limit.',
+      COMMUNITY_PERMISSION_DENIED: 'You do not have permission to do that.',
+      COMMUNITY_EMAIL_CONFIRMATION_REQUIRED: 'Check your email to confirm your account, then sign in.',
+      COMMUNITY_PROFILE_INVALID: 'Display name is required (1–60 characters).'
+    },
+    'zh-CN': {
+      COMMUNITY_NOT_CONFIGURED: '社区后端尚未配置。',
+      COMMUNITY_NETWORK_ERROR: '无法连接到社区后端，请检查网络后重试。',
+      COMMUNITY_AUTH_REQUIRED: '请先登录。',
+      COMMUNITY_AUTH_FAILED: '登录失败，请检查邮箱和密码。',
+      COMMUNITY_RELEASE_NOT_FOUND: '未找到该作品发布。',
+      COMMUNITY_RELEASE_WITHDRAWN: '该作品发布已被创作者撤下。',
+      COMMUNITY_PUBLISH_FAILED: '发布失败，请重试。',
+      COMMUNITY_RELEASE_INVALID: '该文件不是有效的社区作品发布，或超出大小/数量限制。',
+      COMMUNITY_PERMISSION_DENIED: '你没有权限执行此操作。',
+      COMMUNITY_EMAIL_CONFIRMATION_REQUIRED: '请查收邮件以确认账号，然后登录。',
+      COMMUNITY_PROFILE_INVALID: '显示名称为必填项（1–60 个字符）。'
+    }
+  };
+  function errMsg(code){
+    return (ERROR_MESSAGES[locale] && ERROR_MESSAGES[locale][code]) || (ERROR_MESSAGES['en-US'][code]) || t('genericError');
+  }
+
+  // ===================================================================
+  // Session state — Portal-owned, in-memory + this-page-only
+  // localStorage persistence (so a reload doesn't sign you out). This
+  // key is never read by index.html (a different file, and in
+  // production a different origin) and this Portal never writes the
+  // token anywhere index.html could observe it (no URL params, no
+  // postMessage, no shared storage key, no clipboard).
+  // ===================================================================
+  let session = null; // {access_token, refresh_token, expires_at, user:{id,email}}
+
+  function loadSession(){
+    try{
+      const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+      if(raw) session = JSON.parse(raw);
+    }catch(e){ session = null; }
+  }
+  function saveSession(){
+    try{
+      if(session) localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      else localStorage.removeItem(SESSION_STORAGE_KEY);
+    }catch(e){}
+  }
+
+  // ===================================================================
+  // Network layer — raw fetch() against Supabase's REST endpoints
+  // (GoTrue Auth, PostgREST, Edge Functions). Deliberately NOT the
+  // supabase-js SDK: this Portal is meant to stay a small, fully
+  // auditable, zero-build, dependency-free file exactly like the
+  // Runtime — introducing supabase-js would mean loading a
+  // multi-hundred-KB third-party bundle (from a CDN, or vendored) into
+  // the one page in this project that holds live Auth tokens. Raw
+  // fetch() against documented REST endpoints keeps every network call
+  // this page ever makes visible directly in this file. Tradeoff:
+  // slightly more boilerplate (manual header/query construction, no
+  // built-in retry/refresh helpers) in exchange for zero supply-chain
+  // surface and full auditability on the one page most worth auditing.
+  // ===================================================================
+  function apiUrl(path){ return COMMUNITY_BACKEND_CONFIG.supabaseUrl.replace(/\/$/, '') + path; }
+
+  async function callFetch(path, options){
+    if(!COMMUNITY_BACKEND_CONFIG.enabled || !COMMUNITY_BACKEND_CONFIG.supabaseUrl || !COMMUNITY_BACKEND_CONFIG.publishableKey){
+      const e = new Error('not configured'); e.code = 'COMMUNITY_NOT_CONFIGURED'; throw e;
+    }
+    const headers = Object.assign({
+      'apikey': COMMUNITY_BACKEND_CONFIG.publishableKey,
+      'Content-Type': 'application/json'
+    }, (options && options.headers) || {});
+    if(session && session.access_token && !headers.Authorization){
+      headers.Authorization = 'Bearer ' + session.access_token;
+    }
+    let resp;
+    try{
+      resp = await fetch(apiUrl(path), Object.assign({}, options, {headers}));
+    }catch(netErr){
+      const e = new Error('network'); e.code = 'COMMUNITY_NETWORK_ERROR'; throw e;
+    }
+    return resp;
+  }
+
+  async function authSignUp(email, password){
+    const resp = await callFetch('/auth/v1/signup', {method:'POST', body: JSON.stringify({email, password})});
+    const data = await resp.json().catch(()=>({}));
+    if(!resp.ok){
+      const e = new Error(data.msg || data.error_description || 'signup failed'); e.code = 'COMMUNITY_AUTH_FAILED'; throw e;
+    }
+    // Projects with email confirmation enabled return a user but no
+    // access_token until the user clicks the confirmation link.
+    if(data.access_token){
+      session = {access_token: data.access_token, refresh_token: data.refresh_token, user: data.user};
+      saveSession();
+      return {confirmed: true};
+    }
+    return {confirmed: false};
+  }
+
+  async function authSignIn(email, password){
+    const resp = await callFetch('/auth/v1/token?grant_type=password', {method:'POST', body: JSON.stringify({email, password})});
+    const data = await resp.json().catch(()=>({}));
+    if(!resp.ok){
+      const e = new Error(data.msg || data.error_description || 'signin failed'); e.code = 'COMMUNITY_AUTH_FAILED'; throw e;
+    }
+    session = {access_token: data.access_token, refresh_token: data.refresh_token, user: data.user};
+    saveSession();
+    return session;
+  }
+
+  async function authSignOut(){
+    if(session && session.access_token){
+      try{ await callFetch('/auth/v1/logout', {method:'POST', headers:{Authorization:'Bearer '+session.access_token}}); }catch(e){}
+    }
+    session = null;
+    saveSession();
+  }
+
+  async function restRequest(path, options){
+    const resp = await callFetch('/rest/v1' + path, options);
+    const text = await resp.text();
+    let data = null;
+    try{ data = text ? JSON.parse(text) : null; }catch(e){ data = null; }
+    if(!resp.ok){
+      let code = 'COMMUNITY_PUBLISH_FAILED';
+      if(resp.status === 401) code = 'COMMUNITY_AUTH_REQUIRED';
+      else if(resp.status === 403) code = 'COMMUNITY_PERMISSION_DENIED';
+      else if(resp.status === 404) code = 'COMMUNITY_RELEASE_NOT_FOUND';
+      const e = new Error((data && data.message) || 'request failed'); e.code = code; e.status = resp.status; throw e;
+    }
+    return data;
+  }
+
+  async function publishViaEdgeFunction(releaseText){
+    if(!session || !session.access_token){ const e = new Error('auth required'); e.code = 'COMMUNITY_AUTH_REQUIRED'; throw e; }
+    const resp = await callFetch('/functions/v1/publish-release', {
+      method: 'POST',
+      headers: {Authorization: 'Bearer ' + session.access_token},
+      body: JSON.stringify({releaseText})
+    });
+    const data = await resp.json().catch(()=>({}));
+    if(!resp.ok){
+      const code = (data && data.error && data.error.code) || 'COMMUNITY_PUBLISH_FAILED';
+      const e = new Error((data && data.error && data.error.message) || 'publish failed'); e.code = code; throw e;
+    }
+    return data.remoteId;
+  }
+
+  // ===================================================================
+  // Local .vrelease structural validation — mirrors
+  // COMMUNITY_RELEASE_SPEC.md § 3/18 and the Edge Function's own
+  // (authoritative) checks. This is a client-side courtesy check only:
+  // the backend always re-validates independently and is never trusted
+  // to have been bypassed by this preview passing.
+  // ===================================================================
+  function byteLength(s){ return new TextEncoder().encode(s).length; }
+
+  function validateReleaseLocally(raw){
+    if(byteLength(raw) > MAX_SNAPSHOT_BYTES) return {ok:false};
+    let release;
+    try{ release = JSON.parse(raw); }catch(e){ return {ok:false}; }
+    if(release.format !== 'voxel-release') return {ok:false};
+    if(!release.releaseId) return {ok:false};
+    if(!release.game || typeof release.game.title !== 'string' || !release.game.title || release.game.title.length > MAX_TITLE_LEN) return {ok:false};
+    if(typeof release.game.description === 'string' && release.game.description.length > MAX_DESCRIPTION_LEN) return {ok:false};
+    if(!Array.isArray(release.mods) || release.mods.length === 0 || release.mods.length > MAX_MOD_COUNT) return {ok:false};
+    for(const m of release.mods){
+      if(!m || typeof m.source !== 'string' || !m.source || byteLength(m.source) > MAX_MOD_SOURCE_BYTES) return {ok:false};
+      if(!m.manifest || typeof m.manifest.id !== 'string' || !m.manifest.id) return {ok:false};
+    }
+    const md = release.metadata || {};
+    if(md.tags !== undefined && (!Array.isArray(md.tags) || md.tags.length > MAX_TAG_COUNT || md.tags.some(x=>typeof x!=='string' || x.length>MAX_TAG_LEN))) return {ok:false};
+    if(typeof md.releaseNote === 'string' && md.releaseNote.length > MAX_RELEASE_NOTE_LEN) return {ok:false};
+    return {ok:true, release};
+  }
+
+  // ===================================================================
+  // Rendering helpers — textContent ONLY for any untrusted string
+  // (title/description/tags/mod source/snapshot). This page must never
+  // pass release-derived content through innerHTML, and must never
+  // eval/new Function/dynamically create <script> from Mod source. Mod
+  // source is displayed strictly as read-only text for inspection.
+  // ===================================================================
+  function el(tag, cls, text){
+    const e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+  function clear(node){ while(node.firstChild) node.removeChild(node.firstChild); }
+  function showMsg(container, kind, text){
+    clear(container);
+    if(!text) return;
+    const m = el('div', 'msg ' + kind, text);
+    container.appendChild(m);
+  }
+
+  function downloadText(filename, text){
+    const blob = new Blob([text], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  }
+
+  async function copyToClipboard(text){
+    try{ await navigator.clipboard.writeText(text); return true; }
+    catch(e){
+      try{
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        return true;
+      }catch(e2){ return false; }
+    }
+  }
+
+  // ===================================================================
+  // Views
+  // ===================================================================
+  const root = document.getElementById('mainRoot');
+  const TABS = ['auth','profile','publish','mine','browse'];
+  let currentTab = 'auth';
+
+  function renderNav(){
+    const nav = document.getElementById('navBar');
+    clear(nav);
+    const labels = {auth:'navAuth', profile:'navProfile', publish:'navPublish', mine:'navMine', browse:'navBrowse'};
+    TABS.forEach(tabId=>{
+      const b = document.createElement('button');
+      b.textContent = t(labels[tabId]);
+      if(tabId === currentTab) b.className = 'active';
+      b.onclick = ()=>{ currentTab = tabId; renderAll(); };
+      nav.appendChild(b);
+    });
+  }
+
+  function renderHeader(){
+    document.getElementById('hTitle').textContent = t('title');
+    document.getElementById('hSub').textContent = t('subtitle');
+    document.title = t('title');
+  }
+
+  function viewAuth(){
+    const panel = el('div', 'panel');
+    if(session && session.user){
+      panel.appendChild(el('h2', null, t('signIn')));
+      const msg = el('div');
+      panel.appendChild(msg);
+      showMsg(msg, 'ok', t('signedInAs', {email: session.user.email || ''}));
+      const out = el('button', 'btn secondary', t('signOut'));
+      out.style.marginTop = '10px';
+      out.onclick = async ()=>{
+        await authSignOut();
+        currentTab = 'auth';
+        renderAll();
+      };
+      panel.appendChild(out);
+      root.appendChild(panel);
+      return;
+    }
+
+    let mode = 'signin';
+    const wrap = el('div');
+
+    function draw(){
+      clear(wrap);
+      const h = el('h2', null, mode === 'signin' ? t('signIn') : t('signUp'));
+      wrap.appendChild(h);
+
+      const emailLabel = el('label', 'field-label', t('email'));
+      const emailInput = document.createElement('input');
+      emailInput.type = 'email'; emailInput.autocomplete = 'email';
+      const passLabel = el('label', 'field-label', t('password'));
+      const passInput = document.createElement('input');
+      passInput.type = 'password'; passInput.autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
+
+      wrap.appendChild(emailLabel); wrap.appendChild(emailInput);
+      wrap.appendChild(passLabel); wrap.appendChild(passInput);
+
+      const msgBox = el('div');
+      wrap.appendChild(msgBox);
+
+      const row = el('div', 'row');
+      row.style.marginTop = '12px';
+      const submitBtn = el('button', 'btn', mode === 'signin' ? t('signInBtn') : t('signUpBtn'));
+      row.appendChild(submitBtn);
+      wrap.appendChild(row);
+
+      const switchLine = el('div', 'small');
+      switchLine.style.marginTop = '10px';
+      const switchBtn = document.createElement('a');
+      switchBtn.href = '#';
+      switchBtn.textContent = mode === 'signin' ? t('needAccount') : t('alreadyHaveAccount');
+      switchBtn.style.color = 'var(--accent)';
+      switchBtn.onclick = (ev)=>{ ev.preventDefault(); mode = mode === 'signin' ? 'signup' : 'signin'; draw(); };
+      switchLine.appendChild(switchBtn);
+      wrap.appendChild(switchLine);
+
+      submitBtn.onclick = async ()=>{
+        const email = emailInput.value.trim();
+        const password = passInput.value;
+        submitBtn.disabled = true;
+        showMsg(msgBox, 'info', t('loading'));
+        try{
+          if(mode === 'signin'){
+            await authSignIn(email, password);
+            currentTab = 'profile';
+            renderAll();
+          } else {
+            const result = await authSignUp(email, password);
+            if(result.confirmed){
+              currentTab = 'profile';
+              renderAll();
+            } else {
+              showMsg(msgBox, 'warn', errMsg('COMMUNITY_EMAIL_CONFIRMATION_REQUIRED'));
+              mode = 'signin';
+            }
+          }
+        }catch(e){
+          showMsg(msgBox, 'error', errMsg(e.code) || e.message);
+        }finally{
+          submitBtn.disabled = false;
+        }
+      };
+    }
+    draw();
+    panel.appendChild(wrap);
+    root.appendChild(panel);
+  }
+
+  function viewProfile(){
+    const panel = el('div', 'panel');
+    panel.appendChild(el('h2', null, t('profileTitle')));
+    if(!session || !session.user){
+      showMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
+      root.appendChild(panel);
+      return;
+    }
+    const msgBox = el('div'); panel.appendChild(msgBox);
+
+    const nameLabel = el('label', 'field-label', t('displayName'));
+    const nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.maxLength = 60;
+    const bioLabel = el('label', 'field-label', t('bio'));
+    const bioInput = document.createElement('textarea'); bioInput.maxLength = 500;
+    panel.appendChild(nameLabel); panel.appendChild(nameInput);
+    panel.appendChild(bioLabel); panel.appendChild(bioInput);
+
+    const saveBtn = el('button', 'btn', t('saveProfile'));
+    saveBtn.style.marginTop = '12px';
+    panel.appendChild(saveBtn);
+    root.appendChild(panel);
+
+    (async ()=>{
+      try{
+        const rows = await restRequest('/profiles?user_id=eq.' + encodeURIComponent(session.user.id) + '&select=display_name,bio', {method:'GET'});
+        if(rows && rows[0]){
+          nameInput.value = rows[0].display_name || '';
+          bioInput.value = rows[0].bio || '';
+        }
+      }catch(e){ /* no profile yet -- fine, user can create one */ }
+    })();
+
+    saveBtn.onclick = async ()=>{
+      const display_name = nameInput.value.trim();
+      const bio = bioInput.value.trim();
+      if(!display_name || display_name.length > 60){
+        showMsg(msgBox, 'error', errMsg('COMMUNITY_PROFILE_INVALID'));
+        return;
+      }
+      saveBtn.disabled = true;
+      try{
+        await restRequest('/profiles', {
+          method: 'POST',
+          headers: {Prefer: 'resolution=merge-duplicates,return=minimal'},
+          body: JSON.stringify({user_id: session.user.id, display_name, bio: bio || null})
+        });
+        showMsg(msgBox, 'ok', t('profileSaved'));
+      }catch(e){
+        showMsg(msgBox, 'error', errMsg(e.code) || e.message);
+      }finally{
+        saveBtn.disabled = false;
+      }
+    };
+  }
+
+  function renderModList(container, mods){
+    mods.forEach(m=>{
+      const item = el('div', 'mod-item');
+      const idLine = el('div', 'mid mono', (m.manifest && m.manifest.id) || '?');
+      item.appendChild(idLine);
+      const pre = document.createElement('pre');
+      pre.className = 'src-view';
+      pre.textContent = (m.source || ''); // textContent only -- never executed, never innerHTML
+      item.appendChild(pre);
+      container.appendChild(item);
+    });
+  }
+
+  function viewPublish(){
+    const panel = el('div', 'panel');
+    panel.appendChild(el('h2', null, t('publishTitle')));
+    if(!session || !session.user){
+      showMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
+      root.appendChild(panel);
+      return;
+    }
+    panel.appendChild(el('div', 'small', t('publishHint')));
+
+    const msgBox = el('div'); panel.appendChild(msgBox);
+
+    const fileLabel = el('label', 'field-label', t('chooseFile'));
+    const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = '.vrelease,application/json';
+    panel.appendChild(fileLabel); panel.appendChild(fileInput);
+
+    const previewBox = el('div');
+    panel.appendChild(previewBox);
+
+    let currentRaw = null;
+    let currentRelease = null;
+
+    fileInput.onchange = ()=>{
+      clear(previewBox);
+      currentRaw = null; currentRelease = null;
+      const file = fileInput.files && fileInput.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const raw = String(reader.result || '');
+        const validated = validateReleaseLocally(raw);
+        if(!validated.ok){
+          showMsg(msgBox, 'error', errMsg('COMMUNITY_RELEASE_INVALID'));
+          return;
+        }
+        showMsg(msgBox, '', '');
+        currentRaw = raw;
+        currentRelease = validated.release;
+        renderPreview();
+      };
+      reader.onerror = ()=>{ showMsg(msgBox, 'error', errMsg('COMMUNITY_RELEASE_INVALID')); };
+      reader.readAsText(file);
+    };
+
+    function renderPreview(){
+      clear(previewBox);
+      const rel = currentRelease;
+      const card = el('div', 'card');
+      card.appendChild(el('h3', null, rel.game.title));
+      if(rel.game.description) card.appendChild(el('div', 'meta-line', rel.game.description));
+      if(rel.game.authorDisplayName) card.appendChild(el('div', 'meta-line', rel.game.authorDisplayName));
+      const prov = rel.provenance || {};
+      card.appendChild(el('div', 'meta-line', prov.parentReleaseId ? t('remixOf', {title: prov.parentTitle || '?'}) : t('original')));
+      card.appendChild(el('div', 'meta-line', t('modCount', {count: rel.mods.length})));
+      if(rel.metadata && rel.metadata.language) card.appendChild(el('div', 'meta-line', t('language') + ': ' + rel.metadata.language));
+      if(rel.metadata && Array.isArray(rel.metadata.tags) && rel.metadata.tags.length) card.appendChild(el('div', 'meta-line', t('tags') + ': ' + rel.metadata.tags.join(', ')));
+      if(rel.metadata && rel.metadata.releaseNote) card.appendChild(el('div', 'meta-line', t('releaseNote') + ': ' + rel.metadata.releaseNote));
+      previewBox.appendChild(card);
+
+      const notice1 = el('div', 'trust-notice', t('previewHistoryExcluded'));
+      previewBox.appendChild(notice1);
+      const notice2 = el('div', 'trust-notice', t('previewTrust'));
+      previewBox.appendChild(notice2);
+
+      previewBox.appendChild(el('div', 'field-label', t('mods')));
+      renderModList(previewBox, rel.mods);
+
+      const publishBtn = el('button', 'btn', t('publishBtn'));
+      publishBtn.style.marginTop = '10px';
+      publishBtn.onclick = async ()=>{
+        publishBtn.disabled = true;
+        showMsg(msgBox, 'info', t('publishing'));
+        try{
+          const remoteId = await publishViaEdgeFunction(currentRaw);
+          showMsg(msgBox, 'ok', t('publishOk', {id: remoteId}));
+        }catch(e){
+          showMsg(msgBox, 'error', errMsg(e.code) || e.message);
+        }finally{
+          publishBtn.disabled = false;
+        }
+      };
+      previewBox.appendChild(publishBtn);
+    }
+
+    root.appendChild(panel);
+  }
+
+  function releaseCard(row, opts){
+    const card = el('div', 'card');
+    const h = el('h3', null, row.title);
+    const badge = el('span', 'badge ' + (row.is_published ? 'published' : 'withdrawn'), row.is_published ? t('published') : t('withdrawn'));
+    h.appendChild(badge);
+    card.appendChild(h);
+    if(row.description) card.appendChild(el('div', 'meta-line', row.description));
+    card.appendChild(el('div', 'meta-line mono', row.id));
+    card.appendChild(el('div', 'meta-line', t('generationLabel', {gen: row.generation})));
+    if(row.parent_release_id) card.appendChild(el('div', 'meta-line', t('parentLabel', {id: row.parent_release_id})));
+    if(row.language) card.appendChild(el('div', 'meta-line', t('language') + ': ' + row.language));
+    if(row.published_at) card.appendChild(el('div', 'meta-line', row.published_at));
+    if(opts && opts.actions) opts.actions(card, row);
+    return card;
+  }
+
+  function viewMine(){
+    const panel = el('div', 'panel');
+    panel.appendChild(el('h2', null, t('mineTitle')));
+    if(!session || !session.user){
+      showMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
+      root.appendChild(panel);
+      return;
+    }
+    const msgBox = el('div'); panel.appendChild(msgBox);
+    const listBox = el('div'); panel.appendChild(listBox);
+    root.appendChild(panel);
+
+    showMsg(msgBox, 'info', t('loading'));
+    restRequest('/community_releases?creator_id=eq.' + encodeURIComponent(session.user.id) +
+      '&select=id,client_release_id,title,description,language,generation,parent_release_id,is_published,created_at,published_at,snapshot_text&order=created_at.desc', {method:'GET'})
+    .then(rows=>{
+      showMsg(msgBox, '', '');
+      clear(listBox);
+      if(!rows || !rows.length){ showMsg(msgBox, 'info', t('mineEmpty')); return; }
+      rows.forEach(row=>{
+        const card = releaseCard(row, {actions: (card, row)=>{
+          const actions = el('div', 'actions');
+
+          const copyBtn = el('button', 'btn secondary', t('copyId'));
+          copyBtn.onclick = async ()=>{
+            const ok = await copyToClipboard(row.id);
+            if(ok) showMsg(msgBox, 'ok', t('copied'));
+          };
+          actions.appendChild(copyBtn);
+
+          const dlBtn = el('button', 'btn secondary', t('download'));
+          dlBtn.onclick = ()=>{
+            downloadText((row.title || 'release').replace(/[^a-z0-9_-]+/gi,'_') + '.vrelease', row.snapshot_text);
+          };
+          actions.appendChild(dlBtn);
+
+          if(row.is_published){
+            const unpubBtn = el('button', 'btn danger', t('unpublish'));
+            unpubBtn.onclick = async ()=>{
+              if(!confirm(t('unpublishConfirm'))) return;
+              unpubBtn.disabled = true;
+              try{
+                await restRequest('/community_releases?id=eq.' + encodeURIComponent(row.id), {
+                  method: 'PATCH',
+                  headers: {Prefer: 'return=minimal'},
+                  body: JSON.stringify({is_published: false})
+                });
+                showMsg(msgBox, 'ok', t('unpublished'));
+                viewMineRefresh();
+              }catch(e){
+                showMsg(msgBox, 'error', errMsg(e.code) || e.message);
+                unpubBtn.disabled = false;
+              }
+            };
+            actions.appendChild(unpubBtn);
+          }
+
+          card.appendChild(actions);
+        }});
+        listBox.appendChild(card);
+      });
+    })
+    .catch(e=>{ showMsg(msgBox, 'error', errMsg(e.code) || e.message); });
+
+    function viewMineRefresh(){ renderAll(); }
+  }
+
+  function viewBrowse(){
+    const panel = el('div', 'panel');
+    panel.appendChild(el('h2', null, t('browseTitle')));
+
+    const idLabel = el('label', 'field-label', t('remoteIdLabel'));
+    const idInput = document.createElement('input'); idInput.type = 'text';
+    panel.appendChild(idLabel); panel.appendChild(idInput);
+
+    const row = el('div', 'row'); row.style.marginTop = '10px';
+    const lookupBtn = el('button', 'btn', t('lookupBtn'));
+    row.appendChild(lookupBtn);
+    panel.appendChild(row);
+
+    const msgBox = el('div'); panel.appendChild(msgBox);
+    const resultBox = el('div'); panel.appendChild(resultBox);
+    root.appendChild(panel);
+
+    lookupBtn.onclick = async ()=>{
+      const id = idInput.value.trim();
+      if(!id) return;
+      clear(resultBox);
+      showMsg(msgBox, 'info', t('loading'));
+      try{
+        const rows = await restRequest('/community_releases?id=eq.' + encodeURIComponent(id) +
+          '&select=id,title,description,author_display_name,language,release_note,generation,parent_release_id,is_published,published_at&is_published=eq.true', {method:'GET'});
+        if(!rows || !rows.length){
+          showMsg(msgBox, 'error', errMsg('COMMUNITY_RELEASE_NOT_FOUND'));
+          return;
+        }
+        showMsg(msgBox, '', '');
+        const release = rows[0];
+
+        const [mods, tags] = await Promise.all([
+          restRequest('/community_release_mods?release_id=eq.' + encodeURIComponent(id) + '&select=position,manifest_id,manifest_name&order=position.asc', {method:'GET'}).catch(()=>[]),
+          restRequest('/community_release_tags?release_id=eq.' + encodeURIComponent(id) + '&select=tag', {method:'GET'}).catch(()=>[])
+        ]);
+
+        const card = el('div', 'card');
+        card.appendChild(el('h3', null, release.title));
+        if(release.description) card.appendChild(el('div', 'meta-line', release.description));
+        if(release.author_display_name) card.appendChild(el('div', 'meta-line', release.author_display_name));
+        card.appendChild(el('div', 'meta-line', t('generationLabel', {gen: release.generation})));
+        if(release.language) card.appendChild(el('div', 'meta-line', t('language') + ': ' + release.language));
+        if(release.release_note) card.appendChild(el('div', 'meta-line', t('releaseNote') + ': ' + release.release_note));
+        if(tags && tags.length) card.appendChild(el('div', 'meta-line', t('tags') + ': ' + tags.map(x=>x.tag).join(', ')));
+        card.appendChild(el('div', 'meta-line', t('mods') + ': ' + mods.map(m=>m.manifest_id).join(', ')));
+        resultBox.appendChild(card);
+
+        // Direct parent
+        const parentBox = el('div', 'panel');
+        parentBox.appendChild(el('h2', null, t('directParent')));
+        if(release.parent_release_id){
+          try{
+            const prows = await restRequest('/community_releases?id=eq.' + encodeURIComponent(release.parent_release_id) +
+              '&select=id,title&is_published=eq.true', {method:'GET'});
+            if(prows && prows.length){
+              parentBox.appendChild(el('div', 'meta-line', prows[0].title + ' (' + prows[0].id + ')'));
+            } else {
+              parentBox.appendChild(el('div', 'meta-line', t('none')));
+            }
+          }catch(e){ parentBox.appendChild(el('div', 'meta-line', t('none'))); }
+        } else {
+          parentBox.appendChild(el('div', 'meta-line', t('none')));
+        }
+        resultBox.appendChild(parentBox);
+
+        // Direct remixes
+        const remixBox = el('div', 'panel');
+        remixBox.appendChild(el('h2', null, t('directRemixes')));
+        try{
+          const crows = await restRequest('/community_releases?parent_release_id=eq.' + encodeURIComponent(id) +
+            '&is_published=eq.true&select=id,title', {method:'GET'});
+          if(crows && crows.length){
+            crows.forEach(c=>remixBox.appendChild(el('div', 'meta-line', c.title + ' (' + c.id + ')')));
+          } else {
+            remixBox.appendChild(el('div', 'meta-line', t('none')));
+          }
+        }catch(e){ remixBox.appendChild(el('div', 'meta-line', t('none'))); }
+        resultBox.appendChild(remixBox);
+
+      }catch(e){
+        showMsg(msgBox, 'error', errMsg(e.code) || e.message);
+      }
+    };
+  }
+
+  function renderAll(){
+    renderHeader();
+    renderNav();
+    clear(root);
+    if(!COMMUNITY_BACKEND_CONFIG.enabled){
+      const p = el('div', 'panel');
+      showMsg(p, 'error', errMsg('COMMUNITY_NOT_CONFIGURED'));
+      root.appendChild(p);
+      return;
+    }
+    if(currentTab === 'auth') viewAuth();
+    else if(currentTab === 'profile') viewProfile();
+    else if(currentTab === 'publish') viewPublish();
+    else if(currentTab === 'mine') viewMine();
+    else if(currentTab === 'browse') viewBrowse();
+  }
+
+  document.getElementById('langSelect').addEventListener('change', (ev)=>{
+    locale = ev.target.value;
+    renderAll();
+  });
+
+  loadSession();
+  document.getElementById('langSelect').value = locale;
+  if(session && session.user) currentTab = 'profile';
+  renderAll();
+
+})();
+</script>
+</body>
+</html>

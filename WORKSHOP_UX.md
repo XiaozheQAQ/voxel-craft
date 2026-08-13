@@ -316,3 +316,23 @@ never auto-imports it as a private Workspace. Terminology stays strict:
 Mod Branch / Workspace Fork / Release Remix are three different actions
 with three different buttons, never blurred into a single "fork." Full
 design: `COMMUNITY_RELEASE_SPEC.md`.
+
+## Runtime 0.2 — Community Backend Foundation UX
+
+Directly below the existing local Open Release drop-zone, a new **"Open
+Community Release (remote)"** card: a single text field for a remote
+Release id plus a `[Fetch]` button. Fetch performs one anonymous,
+public read (`runtime.community.getRelease`) and — on success — feeds
+the fetched Release into the **exact same** preview card /
+`[Cancel]`/`[Open Release]` confirmation / trust-notice / Start Remix
+flow the local drop-zone already uses (`communityPendingImport`). There
+is no separate "remote release" preview UI, and no auto-execution —
+fetching only ever populates a preview; opening it is still a distinct,
+explicit click. On failure (not found, withdrawn, network error,
+backend not configured), the existing Export-tab feedback line shows a
+localized message via the same structured-error-code → i18n-key
+convention every other error surface in this Runtime uses. This is the
+Runtime's *only* new UI surface this milestone — everything else
+(Auth, publish, manage releases) lives in the separate `community.html`
+Portal, never in the Workshop. Full design:
+`COMMUNITY_BACKEND_SPEC.md`.
