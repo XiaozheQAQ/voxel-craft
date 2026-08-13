@@ -1,0 +1,3 @@
+// A syntactically valid .vmod file that never calls defineVoxelMod at all.
+var x = 1 + 1;
+console.log("no mod definition here");

@@ -1,0 +1,15 @@
+defineVoxelMod({
+  manifest: {
+    id: "fixtures.super-jump",
+    name: "Super Jump",
+    version: "1.0.0",
+    apiVersion: 1,
+    description: "Golden example: simple mechanic. One event subscription, one API call.",
+    permissions: ["player.modify"]
+  },
+  setup(api) {
+    api.events.on("player.jump", () => {
+      api.player.setVelocityY(14);
+    });
+  }
+});

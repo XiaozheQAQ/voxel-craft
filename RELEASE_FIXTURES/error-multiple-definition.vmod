@@ -1,0 +1,8 @@
+defineVoxelMod({
+  manifest: { id: "fixtures.multi-a", name: "Multi A", version: "1.0.0", apiVersion: 1, permissions: [] },
+  setup(api) {}
+});
+defineVoxelMod({
+  manifest: { id: "fixtures.multi-b", name: "Multi B", version: "1.0.0", apiVersion: 1, permissions: [] },
+  setup(api) {}
+});

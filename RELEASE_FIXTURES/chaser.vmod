@@ -1,0 +1,39 @@
+defineVoxelMod({
+  manifest: {
+    id: "fixtures.chaser",
+    name: "Chaser",
+    version: "1.0.0",
+    apiVersion: 1,
+    description: "Golden example: entity/gameplay. A single entity type that walks toward the player every tick. Demonstrates the correct tick(entity, ctx, dt) signature and the nested entity.position.x/y/z mutation rule (never entity.x/y/z directly -- see RUNTIME_API.md).",
+    permissions: ["world.read", "player.read", "entity.spawn", "entity.read", "ui"]
+  },
+  setup(api) {
+    const NS = "fixtures_chaser";
+    const TYPE_ID = NS + ":chaser";
+    const HUD_ID = NS + ":hud";
+    const SPEED = 2.5;
+
+    api.entities.registerType({
+      id: TYPE_ID,
+      model: { type: "box", size: [0.8, 0.8, 0.8], color: "#e6483f" },
+      defaults: {},
+      tick(entity, ctx, dt) {
+        const target = ctx.player.getPosition();
+        const dx = target.x - entity.position.x;
+        const dz = target.z - entity.position.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0.5) {
+          const step = Math.min(dist, SPEED * dt);
+          entity.position.x += (dx / dist) * step;
+          entity.position.z += (dz / dist) * step;
+        }
+        entity.position.y = ctx.world.getHeight(Math.round(entity.position.x), Math.round(entity.position.z)) - 1;
+      }
+    });
+
+    const spawnPos = api.player.getPosition();
+    api.entities.spawn(TYPE_ID, { x: spawnPos.x + 6, y: spawnPos.y, z: spawnPos.z + 6 });
+
+    api.ui.setHudText(HUD_ID, "A chaser is nearby.");
+  }
+});

@@ -1,0 +1,13 @@
+defineVoxelMod({
+  manifest: {
+    id: "fixtures.permission-failure",
+    name: "Permission Failure Fixture",
+    version: "1.0.0",
+    apiVersion: 1,
+    permissions: []
+  },
+  setup(api) {
+    // Declares no permissions but calls a player.modify-gated method.
+    api.player.setVelocityY(20);
+  }
+});

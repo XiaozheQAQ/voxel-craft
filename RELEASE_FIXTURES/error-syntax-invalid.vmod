@@ -1,0 +1,9 @@
+defineVoxelMod({
+  manifest: {
+    id: "fixtures.syntax-invalid",
+    name: "Broken Syntax Fixture"
+  setup(api) {
+    // missing comma above, unbalanced braces below
+    console.log("this will never run"
+  }
+});

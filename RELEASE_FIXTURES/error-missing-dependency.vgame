@@ -1,0 +1,23 @@
+{
+  "format": "voxel-game",
+  "formatVersion": 1,
+  "runtimeVersion": "0.1.0",
+  "apiVersion": 1,
+  "vmpVersion": 1,
+  "createdAt": "2026-08-12T00:00:00.000Z",
+  "meta": { "title": "Missing Dependency Fixture", "description": "", "author": "" },
+  "mods": [
+    {
+      "manifest": {
+        "id": "fixtures.needs-missing-dep",
+        "name": "Needs Missing Dependency",
+        "version": "1.0.0",
+        "apiVersion": 1,
+        "permissions": [],
+        "dependencies": { "fixtures.does-not-exist": true }
+      },
+      "source": "defineVoxelMod({ manifest: { id: \"fixtures.needs-missing-dep\", name: \"Needs Missing Dependency\", version: \"1.0.0\", apiVersion: 1, permissions: [], dependencies: { \"fixtures.does-not-exist\": true } }, setup(api) {} });"
+    }
+  ],
+  "settings": { "includeWorkshop": true, "includeDebugTools": false, "startImmediately": false }
+}

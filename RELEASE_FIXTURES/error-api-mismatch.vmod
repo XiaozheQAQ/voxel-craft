@@ -1,0 +1,10 @@
+defineVoxelMod({
+  manifest: {
+    id: "fixtures.api-mismatch",
+    name: "API Mismatch Fixture",
+    version: "1.0.0",
+    apiVersion: 99,
+    permissions: []
+  },
+  setup(api) {}
+});

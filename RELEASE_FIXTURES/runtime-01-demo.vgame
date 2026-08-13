@@ -1,0 +1,64 @@
+{
+  "format": "voxel-game",
+  "formatVersion": 1,
+  "runtimeVersion": "0.1.0",
+  "apiVersion": 1,
+  "vmpVersion": 1,
+  "createdAt": "2026-08-12T13:50:53.867Z",
+  "meta": {
+    "title": "Runtime 0.1 Demo",
+    "description": "Golden demo project for Runtime 0.1: a checkpoint race with a timer and world markers, a rotating buff that changes player abilities, and a hidden-treasure hunt using entities. Demonstrates multiple independent Mods composing cleanly (UI, timers, entities, world mechanics) and is fully remixable in Vibe Workshop.",
+    "author": "Runtime 0.1 Release Fixtures"
+  },
+  "mods": [
+    {
+      "manifest": {
+        "id": "byzhangshuai.checkpoint-race",
+        "name": "Checkpoint Race",
+        "version": "1.0.0",
+        "apiVersion": 1,
+        "permissions": [
+          "world.read",
+          "world.write",
+          "ui"
+        ]
+      },
+      "source": "defineVoxelMod({\n  manifest: {\n    id: \"byzhangshuai.checkpoint-race\",\n    name: \"Checkpoint Race\",\n    version: \"1.0.0\",\n    apiVersion: 1,\n    permissions: [\"world.read\", \"world.write\", \"ui\"]\n  },\n\n  setup(api) {\n    var NS = \"byzhangshuai_checkpoint_race\";\n    var CHECKPOINT_BLOCK = NS + \":checkpoint\";\n    var HUD_STATUS = NS + \":status\";\n    var HUD_TIMER = NS + \":timer\";\n\n    var RACE_SECONDS = 90;\n\n    api.blocks.register({\n      id: CHECKPOINT_BLOCK,\n      name: \"Checkpoint Marker\",\n      solid: false,\n      textures: { all: \"#ffd23f\" }\n    });\n\n    var bounds = api.world.getBounds();\n    var margin = Math.max(2, Math.min(10, Math.floor(Math.min(bounds.w, bounds.d) / 4)));\n    var minX = margin, maxX = Math.max(margin, bounds.w - margin - 1);\n    var minZ = margin, maxZ = Math.max(margin, bounds.d - margin - 1);\n    var midX = Math.floor((minX + maxX) / 2);\n    var midZ = Math.floor((minZ + maxZ) / 2);\n\n    var rawPoints = [\n      { x: minX, z: minZ },\n      { x: maxX, z: minZ },\n      { x: maxX, z: maxZ },\n      { x: minX, z: maxZ },\n      { x: midX, z: midZ }\n    ];\n\n    var checkpoints = [];\n    for (var i = 0; i < rawPoints.length; i++) {\n      var p = rawPoints[i];\n      var cx = Math.max(0, Math.min(bounds.w - 1, Math.floor(p.x)));\n      var cz = Math.max(0, Math.min(bounds.d - 1, Math.floor(p.z)));\n      var cy = api.world.getHeight(cx, cz);\n      checkpoints.push({ x: cx, y: cy, z: cz });\n      api.world.setBlock(cx, cy, cz, CHECKPOINT_BLOCK);\n    }\n\n    var total = checkpoints.length;\n    var currentIndex = 0;\n    var timeLeft = RACE_SECONDS;\n    var raceOver = false;\n    var timerHandle = null;\n    var stepUnsub = null;\n\n    function updateHud() {\n      api.ui.setHudText(HUD_STATUS, \"Checkpoint \" + (currentIndex + 1) + \"/\" + total);\n      api.ui.setHudText(HUD_TIMER, \"Time left: \" + Math.max(0, timeLeft) + \"s\");\n    }\n\n    function stopRace() {\n      raceOver = true;\n      if (timerHandle !== null) {\n        api.time.cancel(timerHandle);\n        timerHandle = null;\n      }\n      if (stepUnsub) {\n        stepUnsub();\n        stepUnsub = null;\n      }\n    }\n\n    function onCheckpointReached() {\n      currentIndex++;\n      if (currentIndex >= total) {\n        var finalTime = RACE_SECONDS - Math.max(0, timeLeft);\n        api.ui.setHudText(HUD_STATUS, \"Checkpoint \" + total + \"/\" + total);\n        api.ui.showBanner(\"Race complete! Final time: \" + finalTime + \"s\", 4000);\n        stopRace();\n        return;\n      }\n      api.ui.showToast(\"Checkpoint \" + currentIndex + \"/\" + total + \" reached!\");\n      updateHud();\n    }\n\n    stepUnsub = api.events.on(\"player.step\", function (payload) {\n      if (raceOver) return;\n      var cp = checkpoints[currentIndex];\n      if (!cp) return;\n      if (Math.floor(payload.x) === cp.x && Math.floor(payload.z) === cp.z) {\n        onCheckpointReached();\n      }\n    });\n\n    timerHandle = api.time.every(1000, function () {\n      if (raceOver) return;\n      timeLeft--;\n      if (timeLeft <= 0) {\n        api.ui.setHudText(HUD_TIMER, \"Time left: 0s\");\n        api.ui.showBanner(\"Time's up! Reached \" + currentIndex + \"/\" + total + \" checkpoints.\", 4000);\n        stopRace();\n        return;\n      }\n      updateHud();\n    });\n\n    api.ui.showBanner(\"Checkpoint Race! Reach all \" + total + \" checkpoints in \" + RACE_SECONDS + \"s.\", 3000);\n    updateHud();\n\n    return function cleanup() {\n      stopRace();\n      api.ui.removeHudText(HUD_STATUS);\n      api.ui.removeHudText(HUD_TIMER);\n    };\n  }\n});"
+    },
+    {
+      "manifest": {
+        "id": "byzhangshuai131.random-blessings",
+        "name": "Random Blessings",
+        "version": "1.0.0",
+        "apiVersion": 1,
+        "permissions": [
+          "player.read",
+          "player.modify",
+          "ui"
+        ]
+      },
+      "source": "defineVoxelMod({\n  manifest: {\n    id: \"byzhangshuai131.random-blessings\",\n    name: \"Random Blessings\",\n    version: \"1.0.0\",\n    apiVersion: 1,\n    permissions: [\"player.read\", \"player.modify\", \"ui\"]\n  },\n\n  setup(api) {\n    var CYCLE_MS = 20000;\n    var DURATION_MS = 10000;\n    var HIGH_JUMP_VELOCITY = 13;\n    var HEAL_INTERVAL_MS = 1000;\n    var HEAL_PER_INTERVAL = 2;\n\n    var BLESSINGS = [\"high_jump\", \"healing\", \"immunity\"];\n    var BLESSING_LABELS = {\n      high_jump: \"High Jump\",\n      healing: \"Healing Over Time\",\n      immunity: \"Immunity\"\n    };\n\n    var HUD_ID = \"blessing_status\";\n\n    var state = {\n      current: null,\n      remainingMs: 0\n    };\n\n    var unsubscribers = [];\n\n    function pickBlessing() {\n      var idx = Math.floor(Math.random() * BLESSINGS.length);\n      return BLESSINGS[idx];\n    }\n\n    function formatSeconds(ms) {\n      return Math.max(0, Math.ceil(ms / 1000));\n    }\n\n    function updateHud() {\n      if (!state.current) {\n        api.ui.setHudText(HUD_ID, \"Blessing: none\");\n        return;\n      }\n      var label = BLESSING_LABELS[state.current] || state.current;\n      api.ui.setHudText(HUD_ID, \"Blessing: \" + label + \" (\" + formatSeconds(state.remainingMs) + \"s)\");\n    }\n\n    function activateBlessing() {\n      state.current = pickBlessing();\n      state.remainingMs = DURATION_MS;\n      updateHud();\n      api.ui.showToast(\"Blessing granted: \" + (BLESSING_LABELS[state.current] || state.current), { ms: 2000 });\n      api.effects.flashScreen(\"#66ffcc\", 250);\n    }\n\n    function clearBlessing() {\n      if (!state.current) return;\n      state.current = null;\n      state.remainingMs = 0;\n      updateHud();\n      api.ui.showToast(\"Blessing faded\", { ms: 1500 });\n    }\n\n    var cycleHandle = api.time.every(CYCLE_MS, function () {\n      activateBlessing();\n    });\n\n    activateBlessing();\n\n    var lastWholeSecond = -1;\n    unsubscribers.push(api.events.on(\"game.tick\", function (payload) {\n      if (!state.current) return;\n      state.remainingMs -= payload.dt * 1000;\n      if (state.remainingMs <= 0) {\n        clearBlessing();\n        return;\n      }\n      var whole = formatSeconds(state.remainingMs);\n      if (whole !== lastWholeSecond) {\n        lastWholeSecond = whole;\n        updateHud();\n      }\n    }));\n\n    unsubscribers.push(api.events.on(\"player.jump\", function () {\n      if (state.current === \"high_jump\") {\n        api.player.setVelocityY(HIGH_JUMP_VELOCITY);\n      }\n    }));\n\n    var healHandle = api.time.every(HEAL_INTERVAL_MS, function () {\n      if (state.current === \"healing\") {\n        api.player.heal(HEAL_PER_INTERVAL);\n      }\n    });\n\n    unsubscribers.push(api.events.on(\"player.damage\", function (payload) {\n      if (state.current === \"immunity\" && payload.amount > 0) {\n        api.player.heal(payload.amount);\n        api.effects.flashScreen(\"#ffffff\", 150);\n      }\n    }));\n\n    updateHud();\n\n    return function cleanup() {\n      api.time.cancel(cycleHandle);\n      api.time.cancel(healHandle);\n      for (var i = 0; i < unsubscribers.length; i++) {\n        unsubscribers[i]();\n      }\n      api.ui.removeHudText(HUD_ID);\n    };\n  }\n});"
+    },
+    {
+      "manifest": {
+        "id": "byzhangshuai131.treasure-hunt",
+        "name": "Treasure Hunt",
+        "version": "1.0.0",
+        "apiVersion": 1,
+        "permissions": [
+          "world.read",
+          "entity.spawn",
+          "entity.modify",
+          "player.read",
+          "ui"
+        ]
+      },
+      "source": "defineVoxelMod({\n  manifest: {\n    id: \"byzhangshuai131.treasure-hunt\",\n    name: \"Treasure Hunt\",\n    version: \"1.0.0\",\n    apiVersion: 1,\n    permissions: [\"world.read\", \"entity.spawn\", \"entity.modify\", \"player.read\", \"ui\"]\n  },\n  setup(api) {\n    var NS = \"byzhangshuai131_treasure_hunt\";\n    var TOTAL = 8;\n    var HUD_ID = NS + \":progress\";\n    var TREASURE_TYPE = api.entities.registerType({\n      id: NS + \":treasure\",\n      model: { shape: \"box\", size: [0.6, 0.6, 0.6] },\n      defaults: { color: \"#ffd700\" }\n    });\n\n    var bounds = api.world.getBounds();\n    var w = bounds.w;\n    var d = bounds.d;\n\n    var fracs = [\n      [0.15, 0.15],\n      [0.85, 0.15],\n      [0.15, 0.85],\n      [0.85, 0.85],\n      [0.5, 0.1],\n      [0.5, 0.9],\n      [0.1, 0.5],\n      [0.9, 0.5]\n    ];\n\n    var locations = [];\n    for (var i = 0; i < TOTAL; i++) {\n      var fx = fracs[i][0];\n      var fz = fracs[i][1];\n      var x = Math.max(1, Math.min(w - 2, Math.floor(fx * w)));\n      var z = Math.max(1, Math.min(d - 2, Math.floor(fz * d)));\n      var y = api.world.getHeight(x, z);\n      locations.push({ x: x + 0.5, y: y, z: z + 0.5 });\n    }\n\n    var collected = 0;\n    var currentIndex = 0;\n    var currentEntityId = null;\n    var finished = false;\n\n    function spawnCurrent() {\n      var loc = locations[currentIndex];\n      currentEntityId = api.entities.spawn(TREASURE_TYPE, { x: loc.x, y: loc.y, z: loc.z });\n    }\n\n    function updateHud() {\n      api.ui.setHudText(HUD_ID, \"Treasures: \" + collected + \"/\" + TOTAL);\n    }\n\n    updateHud();\n    spawnCurrent();\n    api.ui.showToast(\"Find the hidden treasure! (1/\" + TOTAL + \")\");\n\n    var unsubTick = api.events.on(\"game.tick\", function () {\n      if (finished || currentEntityId === null) return;\n\n      var loc = locations[currentIndex];\n      var pos = api.player.getPosition();\n      var dx = pos.x - loc.x;\n      var dy = pos.y - loc.y;\n      var dz = pos.z - loc.z;\n      var horizDist = Math.sqrt(dx * dx + dz * dz);\n\n      if (horizDist < 1.5 && Math.abs(dy) < 2.5) {\n        api.entities.remove(currentEntityId);\n        currentEntityId = null;\n        collected++;\n        currentIndex++;\n        updateHud();\n\n        if (collected >= TOTAL) {\n          finished = true;\n          api.ui.showBanner(\"All treasures found! Victory!\", 3500);\n          api.ui.setHudText(HUD_ID, \"Treasures: \" + TOTAL + \"/\" + TOTAL + \" - Complete!\");\n        } else {\n          api.ui.showToast(\"Treasure found! (\" + collected + \"/\" + TOTAL + \") Next objective revealed.\");\n          spawnCurrent();\n        }\n      }\n    });\n\n    return function teardown() {\n      api.events.off(unsubTick);\n      api.ui.removeHudText(HUD_ID);\n    };\n  }\n});"
+    }
+  ],
+  "settings": {
+    "includeWorkshop": true,
+    "includeDebugTools": false,
+    "startImmediately": false
+  }
+}

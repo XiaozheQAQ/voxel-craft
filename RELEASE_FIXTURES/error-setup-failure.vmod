@@ -1,0 +1,12 @@
+defineVoxelMod({
+  manifest: {
+    id: "fixtures.setup-failure",
+    name: "Setup Failure Fixture",
+    version: "1.0.0",
+    apiVersion: 1,
+    permissions: []
+  },
+  setup(api) {
+    throw new Error("intentional failure inside setup()");
+  }
+});

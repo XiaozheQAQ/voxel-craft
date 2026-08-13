@@ -1,0 +1,117 @@
+defineVoxelMod({
+  manifest: {
+    id: "byzhangshuai.checkpoint-race",
+    name: "Checkpoint Race",
+    version: "1.0.0",
+    apiVersion: 1,
+    permissions: ["world.read", "world.write", "ui"]
+  },
+
+  setup(api) {
+    var NS = "byzhangshuai_checkpoint_race";
+    var CHECKPOINT_BLOCK = NS + ":checkpoint";
+    var HUD_STATUS = NS + ":status";
+    var HUD_TIMER = NS + ":timer";
+
+    var RACE_SECONDS = 90;
+
+    api.blocks.register({
+      id: CHECKPOINT_BLOCK,
+      name: "Checkpoint Marker",
+      solid: false,
+      textures: { all: "#ffd23f" }
+    });
+
+    var bounds = api.world.getBounds();
+    var margin = Math.max(2, Math.min(10, Math.floor(Math.min(bounds.w, bounds.d) / 4)));
+    var minX = margin, maxX = Math.max(margin, bounds.w - margin - 1);
+    var minZ = margin, maxZ = Math.max(margin, bounds.d - margin - 1);
+    var midX = Math.floor((minX + maxX) / 2);
+    var midZ = Math.floor((minZ + maxZ) / 2);
+
+    var rawPoints = [
+      { x: minX, z: minZ },
+      { x: maxX, z: minZ },
+      { x: maxX, z: maxZ },
+      { x: minX, z: maxZ },
+      { x: midX, z: midZ }
+    ];
+
+    var checkpoints = [];
+    for (var i = 0; i < rawPoints.length; i++) {
+      var p = rawPoints[i];
+      var cx = Math.max(0, Math.min(bounds.w - 1, Math.floor(p.x)));
+      var cz = Math.max(0, Math.min(bounds.d - 1, Math.floor(p.z)));
+      var cy = api.world.getHeight(cx, cz);
+      checkpoints.push({ x: cx, y: cy, z: cz });
+      api.world.setBlock(cx, cy, cz, CHECKPOINT_BLOCK);
+    }
+
+    var total = checkpoints.length;
+    var currentIndex = 0;
+    var timeLeft = RACE_SECONDS;
+    var raceOver = false;
+    var timerHandle = null;
+    var stepUnsub = null;
+
+    function updateHud() {
+      api.ui.setHudText(HUD_STATUS, "Checkpoint " + (currentIndex + 1) + "/" + total);
+      api.ui.setHudText(HUD_TIMER, "Time left: " + Math.max(0, timeLeft) + "s");
+    }
+
+    function stopRace() {
+      raceOver = true;
+      if (timerHandle !== null) {
+        api.time.cancel(timerHandle);
+        timerHandle = null;
+      }
+      if (stepUnsub) {
+        stepUnsub();
+        stepUnsub = null;
+      }
+    }
+
+    function onCheckpointReached() {
+      currentIndex++;
+      if (currentIndex >= total) {
+        var finalTime = RACE_SECONDS - Math.max(0, timeLeft);
+        api.ui.setHudText(HUD_STATUS, "Checkpoint " + total + "/" + total);
+        api.ui.showBanner("Race complete! Final time: " + finalTime + "s", 4000);
+        stopRace();
+        return;
+      }
+      api.ui.showToast("Checkpoint " + currentIndex + "/" + total + " reached!");
+      updateHud();
+    }
+
+    stepUnsub = api.events.on("player.step", function (payload) {
+      if (raceOver) return;
+      var cp = checkpoints[currentIndex];
+      if (!cp) return;
+      if (Math.floor(payload.x) === cp.x && Math.floor(payload.z) === cp.z) {
+        onCheckpointReached();
+      }
+    });
+
+    timerHandle = api.time.every(1000, function () {
+      if (raceOver) return;
+      timeLeft--;
+      if (timeLeft <= 0) {
+        api.ui.setHudText(HUD_TIMER, "Time left: 0s");
+        api.ui.showBanner("Time's up! Reached " + currentIndex + "/" + total + " checkpoints.", 4000);
+        stopRace();
+        return;
+      }
+      updateHud();
+    });
+
+    api.ui.showBanner("Checkpoint Race! Reach all " + total + " checkpoints in " + RACE_SECONDS + "s.", 3000);
+    updateHud();
+
+    return function cleanup() {
+      stopRace();
+      api.ui.removeHudText(HUD_STATUS);
+      api.ui.removeHudText(HUD_TIMER);
+    };
+  }
+});
