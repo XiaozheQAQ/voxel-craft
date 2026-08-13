@@ -418,6 +418,16 @@ file — no secret ever needs to appear in either file for this to work.
 See `COMMUNITY_BACKEND_SETUP.md` for the concrete deployment/config
 walkthrough.
 
+## 13.1 Superseded by / see also
+
+The Community Discovery & Release Pages milestone (`COMMUNITY_DISCOVERY_SPEC.md`)
+builds the public browsing/search/Release-detail/profile UI on top of
+everything in this document, adds one new `security_invoker` read-model
+view, and adds `index.html`'s only Discovery-related surface (a
+`?communityRelease=` handoff hook). Nothing in this document was changed
+or superseded by it — this remains the source of truth for the schema,
+RLS, publish transaction, and Auth architecture.
+
 ## 14. Remaining limitations
 
 - No marketplace/discovery/browsing UI, no likes/ratings/comments, no

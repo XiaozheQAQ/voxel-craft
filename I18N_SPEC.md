@@ -304,3 +304,22 @@ sign-out, email-confirmation-required messaging), profile editing,
 publish preview/confirm, My Releases management, and public-release
 lookup — verified live end-to-end in `zh-CN`, including hostile-content
 strings rendered correctly as literal text. See `COMMUNITY_BACKEND_SPEC.md`.
+
+## Runtime 0.2 addendum — Community Discovery & Release Pages
+
+`community.html`'s catalog grew four new namespaced families —
+`explore.*`, `filters.*`, `release.*`, `profile.*` — covering Explore
+(search/loading/empty/load-more), language/tag filter labels, the public
+Release detail page (compatibility labels, remix/parent phrasing,
+technical details, download/open/remix/copy-link actions), and the
+public profile page. Parity re-verified by extracting and diffing the
+live `CATALOG` object from the running page (no automated `?dev=1`-style
+audit exists for this file's self-contained catalog, unlike
+`index.html`'s): **118 keys per locale, zero mismatch.** Full live zh-CN
+and en-US regression passes conducted for the entire Discovery flow —
+see `COMMUNITY_DISCOVERY_SPEC.md` § 12. `index.html`'s own catalog was
+not changed this milestone (the Runtime's only Discovery-related
+addition, the `?communityRelease=` handoff, reuses the existing
+`community.remote*`/`community.*` keys from the prior milestone
+verbatim) — reconfirmed via the `?dev=1` audit still reporting all
+locale catalogs in sync.

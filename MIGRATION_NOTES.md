@@ -1051,3 +1051,67 @@ here is `api.*`. `RUNTIME_VERSION` remains `0.2.0-dev` -- this milestone
 is not a stable 0.2 release. Full design, schema, RLS matrix, and
 acceptance-test results:
 `COMMUNITY_BACKEND_SPEC.md` / `COMMUNITY_BACKEND_SETUP.md`.
+
+013 (Runtime 0.2, Community Discovery & Release Pages): turned the
+backend into a usable, anonymous-first discovery experience --
+Explore (search/filters/keyset pagination, `published_at DESC` only),
+a public Release detail page, and a public profile page, all inside
+`community.html`. One new `security_invoker` read-model view
+(`community_release_cards`) avoids N+1 card queries; `index.html` gained
+exactly one new hook (`?communityRelease=<uuid>` auto-preview, never
+auto-execute) as the Portal's Runtime-handoff receiving end. Two real
+bugs found and fixed live: an expired session token was silently
+breaking anonymous Explore (fixed via an explicit `anon:true` flag that
+never attaches a token regardless of session state), and `showMsg()`
+misuse was clearing an entire composed page section instead of just an
+inline status line (fixed with new non-destructive `appendMsg()`/
+`toast()` helpers). A third bug -- unencoded search-term characters
+(e.g. `100% off`) breaking `fetch()` outright -- was found during the
+mandated search-input attack-string testing and fixed by percent-encoding
+the ILIKE value. A live no-token-leak test produced a corrected,
+previously-unverified finding rather than a clean pass: `file://`-opening
+`index.html`/`community.html` from the same directory shares one origin
+in the tested environment (`location.origin` was `"file://"` for both),
+making the Portal's session token physically readable from the Runtime's
+`localStorage` -- proof, not just assertion, that the origin-separation
+requirement is load-bearing. No schema field changed on any existing
+table; no Workspace/Release Format field changed. `API_VERSION`/
+`VMP_VERSION`/`GAME_PACKAGE_FORMAT_VERSION`/`WORKSPACE_FORMAT_VERSION`/
+`COMMUNITY_RELEASE_FORMAT_VERSION` all remain unchanged. `RUNTIME_VERSION`
+remains `0.2.0-dev`. Full design, query contract, and acceptance-test
+results: `COMMUNITY_DISCOVERY_SPEC.md`.
+
+014 (Runtime 0.2, Community Discovery release-blocker audit): a
+pre-push audit of 013 found three issues requiring fixes, not just
+wording corrections. (1) The `file://` origin-sharing finding from 013
+had only been documented, not enforced -- fixed by having
+`community.html` detect `location.protocol === 'file:'` and disable
+every authenticated capability outright (sign in, sign up, session
+restore, publish, profile mutation, withdraw), both by not rendering the
+forms and, defense-in-depth, by having the underlying functions
+(`assertAuthAllowed()`) refuse to run; a poisoned/shared session key is
+now actively cleared rather than merely ignored. Re-verified live: a
+`file://` reload with a real prior session present resulted in a `null`
+session immediately, while the same file served via
+`http://localhost:4173` signed in normally. (2) 013's pagination report
+was internally inconsistent (page size 20 claimed alongside a 9-row/
+4-per-page test); audited and corrected: the 4-per-page walk was a
+separate, explicitly test-only page size run as a standalone query
+script, never the app's own code path; the actual production
+`DISCOVERY_PAGE_SIZE=20` was then verified through the real
+`community.html` UI after publishing enough fixtures to exceed one page
+(25 fixtures, page-1=20, page-2=5, 0 duplicates, 0 missing, both counts
+read from the app's own real network requests). (3) 013's lineage test
+wording ("A->C") was audited against the canonical direct-children-only
+requirement; found to be an imprecise report of a 2-level chain, not an
+implementation bug -- re-verified against a genuine 3-generation chain
+(A gen 0 -> B gen 1 -> D gen 2): A's direct children = [B] only, D never
+appears under A; confirmed both via direct query and the live UI at all
+three levels. A fourth, related latent bug was found during this audit
+and fixed alongside the file:// notice: the same `showMsg()`-clears-its-
+container defect from 013 also existed in three "sign-in required"
+early-return branches (Profile/Publish/My Releases when not signed in),
+wiping their heading; fixed with the same `appendMsg()` pattern. No
+schema, format, or `RUNTIME_VERSION` change. Full corrected details:
+`COMMUNITY_DISCOVERY_SPEC.md` § 2/6/10/12, `COMMUNITY_BACKEND_SETUP.md`
+§ 6.

@@ -594,3 +594,38 @@ but that is a property of this Runtime's own code, not a substitute for
 origin separation in deployment — the two are complementary, and neither
 is claimed to be sufficient on its own. Full design, RLS matrix, and the
 security rationale: `COMMUNITY_BACKEND_SPEC.md` § 1.
+
+**This was proven, not just asserted, during the Community Discovery
+milestone**: opening `index.html` and `community.html` via `file://`
+from the same directory (the setup used for this project's own live
+testing) resulted in both files reporting `location.origin === "file://"`
+— the same origin — and `community.html`'s live session token was
+directly readable from `index.html`'s `localStorage`. `index.html`'s own
+code still never touched it (confirmed by inspection), but this is
+concrete proof that a `file://`-based local setup does not by itself
+demonstrate the isolation this design depends on.
+
+**This finding was then closed with a code fix in `community.html`
+itself, not left as a documentation-only caveat**: it now detects
+`location.protocol === 'file:'` and disables every authenticated
+capability outright (sign in, sign up, session restore, publish, profile
+mutation, withdraw) while leaving anonymous public reads fully working.
+`index.html` required no change — it never held a token in the first
+place. See `COMMUNITY_DISCOVERY_SPEC.md` § 2/10 for the full test and
+`COMMUNITY_BACKEND_SETUP.md` § 6 for corrected local-dev guidance.
+
+## Runtime 0.2 — Community Discovery & Release Pages
+
+`index.html` gained exactly one new boot-time hook: if the page loads
+with `?communityRelease=<uuid>` in the URL, the `WorkshopController` IIFE
+opens the Workshop to the Export tab and calls the *existing*
+`runtime.community.getRelease()` anonymous client, populating the
+*existing* `communityPendingImport` preview -- no new preview UI, no new
+Mod-loading path, and critically, no automatic Mod activation. This is
+the receiving end of the Community Portal's "Open in Runtime"/"Remix"
+handoff (`COMMUNITY_DISCOVERY_SPEC.md` § 10) -- the URL carries only the
+public remote Release id, never a token, and this Runtime still never
+holds a Community Auth session. Everything else this milestone built
+(Explore, search, filters, Release/profile pages, pagination) lives
+entirely in `community.html`; `index.html`'s only other footprint is
+this one query-parameter check.

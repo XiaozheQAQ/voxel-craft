@@ -58,6 +58,48 @@
   .small{font-size:12px;color:var(--muted);}
   .divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
   .center{text-align:center;}
+
+  /* Discovery */
+  .search-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .search-bar input[type=text]{flex:1;min-width:180px;}
+  .filters-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+  select.filter{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 9px;font-size:13px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:12px;color:var(--muted);}
+  .chip button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0;line-height:1;}
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;}
+  .release-card{border:1px solid var(--border);border-radius:10px;padding:16px;background:var(--panel2);cursor:pointer;display:flex;flex-direction:column;gap:6px;transition:border-color .15s;}
+  .release-card:hover,.release-card:focus-visible{border-color:var(--accent);}
+  .release-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .release-thumb{width:100%;aspect-ratio:16/9;border-radius:6px;background:linear-gradient(135deg,#2a3346,#1a2030);display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--muted);margin-bottom:2px;}
+  .release-card h3{margin:0;font-size:14px;}
+  .release-card .desc{font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .tag-row{display:flex;gap:5px;flex-wrap:wrap;}
+  .tag-pill{font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(91,141,239,.15);color:#b9d0fb;border:1px solid transparent;cursor:pointer;}
+  .tag-pill:hover{border-color:var(--accent);}
+  .lang-badge{font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid var(--border);color:var(--muted);}
+  .avatar{width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;object-fit:cover;}
+  .avatar-lg{width:72px;height:72px;font-size:26px;}
+  .profile-header{display:flex;gap:14px;align-items:center;margin-bottom:10px;}
+  .load-more{display:block;margin:18px auto 0;}
+  .compat-badge{font-size:11px;padding:3px 9px;border-radius:4px;border:1px solid var(--border);}
+  .compat-badge.ok{color:var(--ok);border-color:var(--ok);}
+  .compat-badge.warn{color:var(--warn);border-color:var(--warn);}
+  .compat-badge.unknown{color:var(--muted);}
+  details.tech-details{margin-top:10px;}
+  details.tech-details summary{cursor:pointer;color:var(--accent);font-size:12px;}
+  a.plain-link{color:var(--accent);text-decoration:none;}
+  a.plain-link:hover{text-decoration:underline;}
+  .skeleton{background:linear-gradient(90deg,var(--panel2) 25%,#2a2f3d 37%,var(--panel2) 63%);background-size:400% 100%;animation:skeleton-loading 1.4s ease infinite;border-radius:6px;}
+  @keyframes skeleton-loading{0%{background-position:100% 50%;}100%{background-position:0 50%;}}
+
+  @media (max-width: 600px){
+    header{flex-direction:column;align-items:stretch;gap:10px;}
+    .top-actions{justify-content:space-between;}
+    main{padding:14px 12px 60px;}
+    .card-grid{grid-template-columns:1fr;}
+    nav{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
+    nav button{flex-shrink:0;}
+  }
 </style>
 </head>
 <body>
@@ -101,10 +143,57 @@
   const COMMUNITY_BACKEND_CONFIG = {
     enabled: true,
     supabaseUrl: 'https://gdfenseaqjhmaspsfpnq.supabase.co',
-    publishableKey: 'sb_publishable_oR6a_j65kCvs6-En27i_vw_YWcNVqiU'
+    publishableKey: 'sb_publishable_oR6a_j65kCvs6-En27i_vw_YWcNVqiU',
+    // Runtime handoff target (spec § 63) -- the ONLY thing ever passed
+    // across this boundary is a remote Release id, as
+    // `?communityRelease=<uuid>`. Never a token. Configurable per
+    // deployment: production should point this at the Runtime's own
+    // origin (e.g. 'https://play.example.com/'), never this Portal's
+    // own origin. Defaults to a same-directory local index.html for
+    // file:///local-dev convenience -- see COMMUNITY_BACKEND_SETUP.md
+    // for the manual file:// handoff workflow when this default can't
+    // be auto-opened (browsers disallow script-initiated file:// window
+    // navigation from a non-file:// page).
+    runtimeBaseUrl: 'index.html'
   };
 
+  // Version metadata this Portal knows about, purely for the honest
+  // "Compatibility" label on a Release detail page (spec § 16) -- NEVER
+  // presented as a safety/trust rating, only version compatibility.
+  // Mirrors index.html's own frozen API_VERSION/VMP_VERSION constants;
+  // this Portal never executes Mods, so it never needs the Runtime's
+  // other internals.
+  const KNOWN_API_VERSION = 1;
+  const KNOWN_VMP_VERSION = 1;
+
   const SESSION_STORAGE_KEY = 'voxelcraft.community.portal.session.v1';
+
+  // ===================================================================
+  // file:// Auth boundary — CODE-ENFORCED, not just documented.
+  //
+  // Live testing during the Discovery milestone proved that opening
+  // index.html and community.html via file:// from the same directory
+  // gives both pages the SAME origin in the tested environment
+  // (`location.origin` was the literal string "file://" for both), so a
+  // Community session stored by this page was directly readable from
+  // index.html's localStorage — and index.html executes untrusted Mod
+  // code with no sandbox. Switching storage keys or moving to
+  // sessionStorage does not fix this: sessionStorage is still readable
+  // by same-origin script, and the underlying problem is that file://
+  // does not reliably give the two pages different origins at all, not
+  // which storage API or key name is used.
+  //
+  // The only real fix is to never let an authenticated Community
+  // session exist at all while this page is running from file://.
+  // Everything gated by `session` below (sign in, sign up, session
+  // restore, publish, profile mutation, My Releases, withdraw) is
+  // disabled outright when `IS_FILE_PROTOCOL` is true; anonymous public
+  // reads (Explore/search/filters/Release detail/public profiles/
+  // download) are completely unaffected. See COMMUNITY_BACKEND_SETUP.md
+  // § 6 and COMMUNITY_DISCOVERY_SPEC.md § 2 for the full writeup and the
+  // recommended localhost/HTTPS-origin-pair development setup.
+  // ===================================================================
+  const IS_FILE_PROTOCOL = location.protocol === 'file:';
   const MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024;
   const MAX_MOD_COUNT = 32;
   const MAX_MOD_SOURCE_BYTES = 256 * 1024;
@@ -124,9 +213,10 @@
     'en-US': {
       title: 'Voxel Craft — Community Portal',
       subtitle: 'Publish, sign in, and manage your Community Releases.',
-      navAuth: 'Account', navProfile: 'Profile', navPublish: 'Publish', navMine: 'My Releases', navBrowse: 'View Release',
+      navExplore: 'Explore', navAuth: 'Account', navProfile: 'Profile', navPublish: 'Publish', navMine: 'My Releases', navSignIn: 'Sign In', navSignOut: 'Sign Out',
       notConfigured: 'The Community backend is not configured on this page.',
       networkError: 'Could not reach the Community backend. Check your connection and try again.',
+      retry: 'Retry',
 
       signIn: 'Sign in', signUp: 'Create account', signOut: 'Sign out',
       email: 'Email', password: 'Password',
@@ -160,21 +250,83 @@
       unpublished: 'Unpublished.', published: 'Published', withdrawn: 'Withdrawn',
       generationLabel: 'Generation {gen}', parentLabel: 'Parent: {id}',
 
-      browseTitle: 'View a Community Release', remoteIdLabel: 'Remote Release ID',
-      lookupBtn: 'Look up', notFound: 'That release could not be found, or is not public.',
+      remoteIdLabel: 'Remote Release ID',
+      notFound: 'That release could not be found, or is not public.',
       permissionDenied: 'You do not have permission to do that.',
       directParent: 'Direct parent', directRemixes: 'Direct remixes', none: 'None',
       mods: 'Mods', tags: 'Tags', language: 'Language', releaseNote: 'Release note',
 
       genericError: 'Something went wrong.',
-      loading: 'Loading…'
+      loading: 'Loading…',
+
+      // --- Explore ---
+      'explore.title': 'Explore',
+      'explore.pageTitle': 'Explore — Voxel Craft Community',
+      'explore.latest': 'Latest releases',
+      'explore.loading': 'Loading releases…',
+      'explore.empty': 'No releases found.',
+      'explore.loadMore': 'Load more',
+      'explore.searchPlaceholder': 'Search games…',
+      'explore.searchButton': 'Search',
+
+      // --- Filters ---
+      'filters.allLanguages': 'All languages',
+      'filters.tagLabel': 'Tag',
+      'filters.clearTag': 'Clear tag: {tag} ×',
+      'filters.clearAll': 'Clear filters',
+
+      // --- Release detail ---
+      'release.loading': 'Loading release details…',
+      'release.notFound': 'That release could not be found, or is not public.',
+      'release.byAuthor': 'by {name}',
+      'release.original': 'Original',
+      'release.remix': 'Remix · Generation {gen}',
+      'release.remixOfTitle': 'Remix of "{title}"',
+      'release.parentUnavailable': 'Original release unavailable',
+      'release.remixesTitle': 'Remixes',
+      'release.remixesEmpty': 'No Remixes yet.',
+      'release.remixCount': '{count} Remix(es)',
+      'release.modsTitle': 'Mods ({count})',
+      'release.viewSource': 'View Source',
+      'release.hideSource': 'Hide Source',
+      'release.downloadBtn': 'Download Release',
+      'release.openInRuntimeBtn': 'Open in Runtime',
+      'release.remixBtn': 'Remix',
+      'release.copyLinkBtn': 'Copy Link',
+      'release.linkCopied': 'Link copied.',
+      'release.techDetails': 'Technical details',
+      'release.runtimeVersion': 'Runtime version',
+      'release.apiVersion': 'API version',
+      'release.vmpVersion': 'VMP version',
+      'release.formatVersion': 'Release format version',
+      'release.publishedAt': 'Published {date}',
+      'release.compatCompatible': 'Compatible',
+      'release.compatUnsupportedApi': 'Unsupported API',
+      'release.compatNewerRuntime': 'Newer Runtime',
+      'release.compatUnknown': 'Unknown compatibility',
+      'release.pageTitleSuffix': ' — Voxel Craft Community',
+      'release.openInRuntimeHint': 'This opens the Runtime in a new tab. The Runtime only receives this Release\'s public id — never your Community sign-in.',
+
+      // --- Profile (public) ---
+      'profile.loading': 'Loading profile…',
+      'profile.notFound': 'This profile could not be found.',
+      'profile.joined': 'Joined {date}',
+      'profile.releasesTitle': 'Releases',
+      'profile.empty': 'This creator has not published any games yet.',
+      'profile.editBtn': 'Edit Profile',
+      'profile.pageTitleSuffix': ' — Voxel Craft Community',
+
+      // --- file:// Auth boundary ---
+      'security.fileProtocolTitle': 'Sign-in is disabled in file:// mode',
+      'security.fileProtocolNotice': 'To keep Community sign-in credentials from being shared with the Mod Runtime\'s browser storage, sign-in is disabled while this page is opened via file://. Open the Community Portal through a localhost or HTTPS address instead.'
     },
     'zh-CN': {
       title: 'Voxel Craft — 社区门户',
       subtitle: '发布、登录并管理你的社区作品发布。',
-      navAuth: '账号', navProfile: '个人资料', navPublish: '发布', navMine: '我的发布', navBrowse: '查看作品',
+      navExplore: '探索', navAuth: '账号', navProfile: '个人资料', navPublish: '发布', navMine: '我的作品', navSignIn: '登录', navSignOut: '退出登录',
       notConfigured: '此页面尚未配置社区后端。',
       networkError: '无法连接到社区后端，请检查网络后重试。',
+      retry: '重试',
 
       signIn: '登录', signUp: '创建账号', signOut: '退出登录',
       email: '邮箱', password: '密码',
@@ -208,14 +360,75 @@
       unpublished: '已撤下。', published: '已发布', withdrawn: '已撤下',
       generationLabel: '第 {gen} 代', parentLabel: '父级：{id}',
 
-      browseTitle: '查看社区作品发布', remoteIdLabel: '远程作品 ID',
-      lookupBtn: '查询', notFound: '未找到该作品，或该作品未公开。',
+      remoteIdLabel: '远程作品 ID',
+      notFound: '未找到该作品，或该作品未公开。',
       permissionDenied: '你没有权限执行此操作。',
       directParent: '直接父级', directRemixes: '直接二次创作', none: '无',
       mods: '模组', tags: '标签', language: '语言', releaseNote: '发布说明',
 
       genericError: '发生错误。',
-      loading: '加载中…'
+      loading: '加载中…',
+
+      // --- Explore ---
+      'explore.title': '探索',
+      'explore.pageTitle': '探索 — Voxel Craft 社区',
+      'explore.latest': '最新作品',
+      'explore.loading': '正在加载作品……',
+      'explore.empty': '未找到符合条件的作品。',
+      'explore.loadMore': '加载更多',
+      'explore.searchPlaceholder': '搜索作品……',
+      'explore.searchButton': '搜索',
+
+      // --- Filters ---
+      'filters.allLanguages': '所有语言',
+      'filters.tagLabel': '标签',
+      'filters.clearTag': '清除标签：{tag} ×',
+      'filters.clearAll': '清除筛选',
+
+      // --- Release detail ---
+      'release.loading': '正在加载作品详情……',
+      'release.notFound': '未找到该作品，或该作品未公开。',
+      'release.byAuthor': '作者：{name}',
+      'release.original': '原创作品',
+      'release.remix': '二次创作 · 第 {gen} 代',
+      'release.remixOfTitle': '基于「{title}」的二次创作',
+      'release.parentUnavailable': '原作品当前不可用',
+      'release.remixesTitle': '二次创作',
+      'release.remixesEmpty': '暂无二次创作。',
+      'release.remixCount': '{count} 个二次创作',
+      'release.modsTitle': '模组（{count}）',
+      'release.viewSource': '查看源码',
+      'release.hideSource': '隐藏源码',
+      'release.downloadBtn': '下载作品文件',
+      'release.openInRuntimeBtn': '在 Runtime 中打开',
+      'release.remixBtn': '开始二次创作',
+      'release.copyLinkBtn': '复制链接',
+      'release.linkCopied': '链接已复制。',
+      'release.techDetails': '技术详情',
+      'release.runtimeVersion': 'Runtime 版本',
+      'release.apiVersion': 'API 版本',
+      'release.vmpVersion': 'VMP 版本',
+      'release.formatVersion': '作品格式版本',
+      'release.publishedAt': '发布于 {date}',
+      'release.compatCompatible': '兼容',
+      'release.compatUnsupportedApi': 'API 不受支持',
+      'release.compatNewerRuntime': '需要更新的 Runtime',
+      'release.compatUnknown': '兼容性未知',
+      'release.pageTitleSuffix': ' — Voxel Craft 社区',
+      'release.openInRuntimeHint': '此操作将在新标签页中打开 Runtime。Runtime 仅会收到该作品的公开 ID —— 绝不会收到你的社区登录信息。',
+
+      // --- Profile (public) ---
+      'profile.loading': '正在加载个人资料……',
+      'profile.notFound': '未找到该个人资料。',
+      'profile.joined': '加入于 {date}',
+      'profile.releasesTitle': '作品',
+      'profile.empty': '该创作者尚未发布任何作品。',
+      'profile.editBtn': '编辑资料',
+      'profile.pageTitleSuffix': ' — Voxel Craft 社区',
+
+      // --- file:// Auth boundary ---
+      'security.fileProtocolTitle': 'file:// 模式下已禁用账号登录',
+      'security.fileProtocolNotice': '为避免社区登录凭据与 Mod Runtime 共享浏览器存储，file:// 模式下已禁用账号登录。请通过 localhost 或 HTTPS 打开社区门户。'
     }
   };
 
@@ -275,12 +488,23 @@
   let session = null; // {access_token, refresh_token, expires_at, user:{id,email}}
 
   function loadSession(){
+    if(IS_FILE_PROTOCOL){
+      // Never restore a session in file:// mode -- and actively remediate
+      // any session a non-file:// visit to this same path may have left
+      // behind (or that a shared-origin file:// environment exposed),
+      // since we know from live testing that this key can be reachable
+      // from index.html's storage under file://.
+      try{ localStorage.removeItem(SESSION_STORAGE_KEY); }catch(e){}
+      session = null;
+      return;
+    }
     try{
       const raw = localStorage.getItem(SESSION_STORAGE_KEY);
       if(raw) session = JSON.parse(raw);
     }catch(e){ session = null; }
   }
   function saveSession(){
+    if(IS_FILE_PROTOCOL){ session = null; return; } // belt-and-suspenders: never persist under file://
     try{
       if(session) localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
       else localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -311,7 +535,16 @@
       'apikey': COMMUNITY_BACKEND_CONFIG.publishableKey,
       'Content-Type': 'application/json'
     }, (options && options.headers) || {});
-    if(session && session.access_token && !headers.Authorization){
+    // `anon: true` (used by every public Discovery read) deliberately
+    // never attaches a session token, even if one exists -- Explore/
+    // Release-detail/Profile must keep working exactly the same whether
+    // signed out, signed in, OR signed in with a stale/expired token
+    // sitting in localStorage. A bad Bearer token makes PostgREST reject
+    // the whole request outright (it does not silently fall back to the
+    // apikey's anon role), which would otherwise break public browsing
+    // for any signed-in user with an expired session -- found live
+    // during testing and fixed by never sending a token for these reads.
+    if(session && session.access_token && !headers.Authorization && !(options && options.anon)){
       headers.Authorization = 'Bearer ' + session.access_token;
     }
     let resp;
@@ -323,7 +556,16 @@
     return resp;
   }
 
+  function assertAuthAllowed(){
+    if(IS_FILE_PROTOCOL){
+      const e = new Error('Community sign-in is disabled in file:// mode.');
+      e.code = 'COMMUNITY_AUTH_DISABLED_FILE_PROTOCOL';
+      throw e;
+    }
+  }
+
   async function authSignUp(email, password){
+    assertAuthAllowed();
     const resp = await callFetch('/auth/v1/signup', {method:'POST', body: JSON.stringify({email, password})});
     const data = await resp.json().catch(()=>({}));
     if(!resp.ok){
@@ -340,6 +582,7 @@
   }
 
   async function authSignIn(email, password){
+    assertAuthAllowed();
     const resp = await callFetch('/auth/v1/token?grant_type=password', {method:'POST', body: JSON.stringify({email, password})});
     const data = await resp.json().catch(()=>({}));
     if(!resp.ok){
@@ -374,6 +617,7 @@
   }
 
   async function publishViaEdgeFunction(releaseText){
+    assertAuthAllowed();
     if(!session || !session.access_token){ const e = new Error('auth required'); e.code = 'COMMUNITY_AUTH_REQUIRED'; throw e; }
     const resp = await callFetch('/functions/v1/publish-release', {
       method: 'POST',
@@ -386,6 +630,139 @@
       const e = new Error((data && data.error && data.error.message) || 'publish failed'); e.code = code; throw e;
     }
     return data.remoteId;
+  }
+
+  // ===================================================================
+  // CommunityClient — the internal public-read layer for Discovery
+  // (spec § 44/45). Every method here is an anonymous-capable, RLS-safe
+  // read against `community_release_cards` (see
+  // supabase/migrations/20260813132449_community_discovery_read_model.sql)
+  // or `profiles`. None of this is exposed as `api.community` -- it is
+  // purely internal to this Portal page, exactly like the Runtime's own
+  // `runtime.community` remote client is internal to index.html.
+  //
+  // Query contract (spec § 45), documented once here rather than
+  // scattered across UI code:
+  //
+  // listReleases({q, language, tag, cursor, limit=20})
+  //   -> {rows, nextCursor}
+  //   Filters: `is_published=eq.true` ALWAYS explicit (see note below),
+  //   optional `q` (ILIKE substring over title/description/
+  //   author_display_name, PostgREST `or=(...)`), optional `language`
+  //   (`eq.`), optional `tag` (resolved via a small indexed lookup
+  //   against community_release_tags first, then `id=in.(...)` against
+  //   the card view -- see resolveTagReleaseIds below; deliberately NOT
+  //   filtering the view's own aggregated `tags` array column, which
+  //   has no supporting index).
+  //   Pagination: keyset/cursor on (published_at, id) DESC, page size
+  //   DISCOVERY_PAGE_SIZE (20) -- see § "Pagination model" in
+  //   COMMUNITY_DISCOVERY_SPEC.md for why this avoids the classic
+  //   offset-pagination duplicate/skip problem under concurrent inserts.
+  //   Returned fields: every column on community_release_cards (id,
+  //   title, description, author_display_name, language, generation,
+  //   parent_release_id, parent_title, runtime/api/vmp/format versions,
+  //   published_at, mod_count, tags[], remix_count).
+  //   RLS: `community_release_cards` is `security_invoker` -- an
+  //   anonymous caller only ever sees rows where
+  //   community_releases.is_published = true (RLS on the base table);
+  //   the explicit `is_published=eq.true` filter here additionally
+  //   keeps a SIGNED-IN caller's own unpublished drafts out of the
+  //   public Explore feed (RLS alone would let an owner see their own
+  //   unpublished rows too -- correct for "My Releases", wrong for
+  //   public Explore).
+  //   Errors: COMMUNITY_NOT_CONFIGURED, COMMUNITY_NETWORK_ERROR.
+  //
+  // getReleaseDetail(remoteId) -> {card, snapshotText} | throws
+  //   COMMUNITY_RELEASE_NOT_FOUND (covers both "never existed" and
+  //   "withdrawn" -- RLS makes an anonymous caller unable to distinguish
+  //   the two, so this client does not pretend to either).
+  //
+  // getChildren(remoteId) -> rows[] (direct published remixes only,
+  //   `parent_release_id=eq.<id>&is_published=eq.true`).
+  //
+  // getProfile(userId) -> row | null (public: `profiles` SELECT policy
+  //   is `using (true)`, never exposes auth.users/email).
+  //
+  // listProfileReleases(userId) -> rows[] (published only --
+  //   `creator_id=eq.<id>&is_published=eq.true`; a profile owner's own
+  //   unpublished Releases are deliberately never shown here, only in
+  //   My Releases under their own authenticated session).
+  // ===================================================================
+
+  const DISCOVERY_PAGE_SIZE = 20;
+
+  function ilikeValue(term){
+    // PostgREST quoted-value syntax: wrap in double quotes and escape
+    // backslash/quote so the value can safely contain `,`/`)`/`(` --
+    // the characters that are structurally significant inside an
+    // `or=(...)` filter group -- without breaking the filter grammar.
+    // This is string ESCAPING for a documented query-parameter syntax,
+    // not manual SQL construction -- PostgREST itself remains the only
+    // thing that ever builds the underlying SQL.
+    //
+    // The escaped text is THEN percent-encoded (encodeURIComponent) --
+    // found live during attack testing (spec § 77) that a raw `%` (or a
+    // space, `&`, `#`, ...) in the search term produced a malformed URL
+    // that made `fetch()` itself throw, surfacing as a false
+    // COMMUNITY_NETWORK_ERROR for an ordinary search term like "100%
+    // off". PostgREST percent-decodes the query string before applying
+    // its own `"..."`/escape grammar, so decode-then-parse still sees
+    // exactly the same `\"`-escaped text -- encoding is transparent to
+    // the filter semantics. The structural `"`/`*` wrapper characters
+    // are added AFTER encoding and stay literal, since PostgREST's own
+    // parser must see them unescaped.
+    const escaped = String(term).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return '"*' + encodeURIComponent(escaped) + '*"';
+  }
+
+  async function resolveTagReleaseIds(tag){
+    const rows = await restRequest('/community_release_tags?tag=eq.' + encodeURIComponent(tag) + '&select=release_id', {method:'GET', anon:true});
+    return (rows || []).map(r => r.release_id);
+  }
+
+  async function listReleases({q, language, tag, cursor, limit} = {}){
+    limit = limit || DISCOVERY_PAGE_SIZE;
+    const params = ['is_published=eq.true', 'select=*', 'order=published_at.desc,id.desc', 'limit=' + limit];
+
+    if(q && q.trim()){
+      const v = ilikeValue(q.trim());
+      params.push('or=(title.ilike.' + v + ',description.ilike.' + v + ',author_display_name.ilike.' + v + ')');
+    }
+    if(language){ params.push('language=eq.' + encodeURIComponent(language)); }
+    if(tag){
+      const ids = await resolveTagReleaseIds(tag);
+      if(ids.length === 0) return {rows: [], nextCursor: null};
+      params.push('id=in.(' + ids.join(',') + ')');
+    }
+    if(cursor){
+      params.push('or=(published_at.lt.' + encodeURIComponent(cursor.published_at) + ',and(published_at.eq.' + encodeURIComponent(cursor.published_at) + ',id.lt.' + cursor.id + '))');
+    }
+
+    const rows = await restRequest('/community_release_cards?' + params.join('&'), {method:'GET', anon:true});
+    const nextCursor = (rows && rows.length === limit) ? {published_at: rows[rows.length-1].published_at, id: rows[rows.length-1].id} : null;
+    return {rows: rows || [], nextCursor};
+  }
+
+  async function getReleaseDetail(remoteId){
+    const rows = await restRequest('/community_release_cards?id=eq.' + encodeURIComponent(remoteId) + '&is_published=eq.true&select=*', {method:'GET', anon:true});
+    if(!rows || !rows.length){ const e = new Error('not found'); e.code = 'COMMUNITY_RELEASE_NOT_FOUND'; throw e; }
+    const card = rows[0];
+    const snapRows = await restRequest('/community_releases?id=eq.' + encodeURIComponent(remoteId) + '&select=snapshot_text', {method:'GET', anon:true});
+    const snapshotText = (snapRows && snapRows[0] && snapRows[0].snapshot_text) || null;
+    return {card, snapshotText};
+  }
+
+  async function getChildren(remoteId){
+    return await restRequest('/community_release_cards?parent_release_id=eq.' + encodeURIComponent(remoteId) + '&is_published=eq.true&select=id,title,author_display_name,generation,mod_count,tags,language,published_at&order=published_at.desc', {method:'GET', anon:true});
+  }
+
+  async function getPublicProfile(userId){
+    const rows = await restRequest('/profiles?user_id=eq.' + encodeURIComponent(userId) + '&select=user_id,display_name,bio,avatar_url,created_at', {method:'GET', anon:true});
+    return (rows && rows[0]) || null;
+  }
+
+  async function listProfileReleases(userId){
+    return await restRequest('/community_release_cards?creator_id=eq.' + encodeURIComponent(userId) + '&is_published=eq.true&select=*&order=published_at.desc', {method:'GET', anon:true});
   }
 
   // ===================================================================
@@ -437,6 +814,25 @@
     container.appendChild(m);
   }
 
+  // Like showMsg, but APPENDS to a larger composed view instead of
+  // clearing the whole container first -- for an inline status line
+  // inside a page section (e.g. "Loading…"/"No Remixes yet." partway
+  // down a Release detail page) that must not wipe unrelated content
+  // rendered earlier in the same panel.
+  function appendMsg(container, kind, text){
+    container.appendChild(el('div', 'msg ' + kind, text));
+  }
+
+  // A brief, self-dismissing toast for an action confirmation (e.g.
+  // "Link copied.") that happens mid-page and must not disturb any
+  // other content already on screen.
+  function toast(text){
+    const t_ = el('div', 'msg ok', text);
+    t_.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100;box-shadow:0 4px 16px rgba(0,0,0,.4);';
+    document.body.appendChild(t_);
+    setTimeout(()=>{ if(t_.parentNode) t_.parentNode.removeChild(t_); }, 2200);
+  }
+
   function downloadText(filename, text){
     const blob = new Blob([text], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -462,34 +858,220 @@
     }
   }
 
+  // Safe download filename from a title (spec § 62): strip slashes,
+  // control chars, and other reserved filesystem characters; fall back
+  // to a short-id-based name if the title sanitizes away to nothing
+  // (e.g. a title that is 100% emoji/symbols).
+  function releaseFilename(title, id){
+    const base = String(title || '').trim().toLowerCase()
+      .replace(/[\/\\?%*:|"<>\x00-\x1f]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    if(base) return base + '.vrelease';
+    const shortId = String(id || '').slice(0, 8) || 'unknown';
+    return 'release-' + shortId + '.vrelease';
+  }
+
+  // ===================================================================
+  // URL-input validation (spec § 40: treat release id / profile id / q /
+  // tag / language as untrusted). These only gate what this Portal will
+  // even attempt to query with -- the database/RLS remains the actual
+  // authority (spec § 29) regardless of what passes here.
+  // ===================================================================
+  const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  function isValidId(v){ return typeof v === 'string' && v.length <= 64 && UUID_RE.test(v); }
+  function sanitizeQueryText(v, maxLen){
+    if(typeof v !== 'string') return '';
+    return v.slice(0, maxLen || 100);
+  }
+
+  // Only https: (plus http: for localhost dev) is ever allowed for a
+  // rendered external link (spec § 42) -- rejects javascript:/data:/etc.
+  function isSafeExternalUrl(url){
+    try{
+      const u = new URL(url, location.href);
+      if(u.protocol === 'https:') return true;
+      if(u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1')) return true;
+      return false;
+    }catch(e){ return false; }
+  }
+
+  function makeExternalLink(url, text){
+    const a = document.createElement('a');
+    if(isSafeExternalUrl(url)){
+      a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    }
+    a.className = 'plain-link';
+    a.textContent = text !== undefined ? text : url;
+    return a;
+  }
+
+  // Compatibility label (spec § 16) -- version compatibility ONLY, never
+  // a safety/trust rating. Compares a Release's recorded api/vmp version
+  // against what THIS Portal knows the current Runtime to require.
+  function compatibilityOf(card){
+    if(typeof card.api_version !== 'number' || typeof card.vmp_version !== 'number'){
+      return {label: 'compatUnknown', cls: 'unknown'};
+    }
+    if(card.api_version === KNOWN_API_VERSION && card.vmp_version === KNOWN_VMP_VERSION){
+      return {label: 'compatCompatible', cls: 'ok'};
+    }
+    if(card.api_version > KNOWN_API_VERSION || card.vmp_version > KNOWN_VMP_VERSION){
+      return {label: 'compatNewerRuntime', cls: 'warn'};
+    }
+    return {label: 'compatUnsupportedApi', cls: 'warn'};
+  }
+
+  function formatDate(iso){
+    if(!iso) return '';
+    try{
+      return new Intl.DateTimeFormat(locale, {dateStyle:'medium', timeStyle:'short'}).format(new Date(iso));
+    }catch(e){ return iso; }
+  }
+
+  function initialsFor(name){
+    const s = String(name || '?').trim();
+    return s ? s[0].toUpperCase() : '?';
+  }
+
+  function renderAvatar(displayName, avatarUrl, large){
+    if(avatarUrl && isSafeExternalUrl(avatarUrl)){
+      const img = document.createElement('img');
+      img.className = 'avatar' + (large ? ' avatar-lg' : '');
+      img.src = avatarUrl; img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      return img;
+    }
+    const div = el('div', 'avatar' + (large ? ' avatar-lg' : ''), initialsFor(displayName));
+    return div;
+  }
+
   // ===================================================================
   // Views
   // ===================================================================
   const root = document.getElementById('mainRoot');
-  const TABS = ['auth','profile','publish','mine','browse'];
-  let currentTab = 'auth';
+
+  // ===================================================================
+  // Routing (spec § 12/13) -- shareable URLs via query parameters, no
+  // SPA framework. `?release=<uuid>` and `?profile=<uuid>` are page
+  // routes (mutually exclusive with each other and with Explore's own
+  // `?q=&lang=&tag=` filter state); everything else (auth/profile-edit/
+  // publish/my-releases) is a private, non-shareable tab reached only
+  // via nav clicks, which clear the query string.
+  // ===================================================================
+  let currentTab = 'explore';
+  let exploreState = {q:'', language:'', tag:'', rows:[], nextCursor:null, loading:false, error:null, lastQueryKey:null, onDraw:null};
+  let releaseViewState = {id:null, loading:false, error:null, card:null, snapshotText:null, children:null, onDraw:null};
+  let profileViewState = {id:null, loading:false, error:null, profile:null, releases:null, onDraw:null};
+
+  function parseRoute(){
+    const params = new URLSearchParams(location.search);
+    const releaseId = params.get('release');
+    const profileId = params.get('profile');
+    if(releaseId && isValidId(releaseId)){
+      currentTab = 'release';
+      if(releaseViewState.id !== releaseId){
+        releaseViewState = {id: releaseId, loading:true, error:null, card:null, snapshotText:null, children:null, onDraw:null};
+        loadReleaseView(releaseId);
+      }
+      return;
+    }
+    if(profileId && isValidId(profileId)){
+      currentTab = 'profileView';
+      if(profileViewState.id !== profileId){
+        profileViewState = {id: profileId, loading:true, error:null, profile:null, releases:null, onDraw:null};
+        loadProfileView(profileId);
+      }
+      return;
+    }
+    currentTab = 'explore';
+    exploreState.q = sanitizeQueryText(params.get('q') || '', 100);
+    exploreState.language = params.get('lang') || '';
+    exploreState.tag = sanitizeQueryText(params.get('tag') || '', 32);
+  }
+
+  // Pushes new URL state for a route that should be shareable/
+  // bookmarkable (explore filters, release, profile) and re-renders.
+  function navigateTo(patch){
+    const usp = new URLSearchParams();
+    const merged = Object.assign({q: exploreState.q, lang: exploreState.language, tag: exploreState.tag}, patch);
+    if(patch.release){ usp.set('release', patch.release); }
+    else if(patch.profile){ usp.set('profile', patch.profile); }
+    else{
+      if(merged.q) usp.set('q', merged.q);
+      if(merged.lang) usp.set('lang', merged.lang);
+      if(merged.tag) usp.set('tag', merged.tag);
+    }
+    const qs = usp.toString();
+    history.pushState(null, '', location.pathname + (qs ? '?' + qs : ''));
+    parseRoute();
+    renderAll();
+  }
+
+  // Private, non-shareable tabs (spec § 4) -- always clears any
+  // release/profile/filter query state.
+  function goToTab(tabId){
+    currentTab = tabId;
+    history.pushState(null, '', location.pathname);
+    renderAll();
+  }
+
+  window.addEventListener('popstate', ()=>{ parseRoute(); renderAll(); });
 
   function renderNav(){
     const nav = document.getElementById('navBar');
     clear(nav);
-    const labels = {auth:'navAuth', profile:'navProfile', publish:'navPublish', mine:'navMine', browse:'navBrowse'};
-    TABS.forEach(tabId=>{
-      const b = document.createElement('button');
-      b.textContent = t(labels[tabId]);
-      if(tabId === currentTab) b.className = 'active';
-      b.onclick = ()=>{ currentTab = tabId; renderAll(); };
-      nav.appendChild(b);
-    });
+    const exploreBtn = document.createElement('button');
+    exploreBtn.textContent = t('navExplore');
+    if(currentTab === 'explore') exploreBtn.className = 'active';
+    exploreBtn.onclick = ()=>navigateTo({});
+    nav.appendChild(exploreBtn);
+
+    if(session && session.user){
+      [['mine','navMine'], ['publish','navPublish'], ['profile','navProfile']].forEach(([id, key])=>{
+        const b = document.createElement('button');
+        b.textContent = t(key);
+        if(currentTab === id) b.className = 'active';
+        b.onclick = ()=>goToTab(id);
+        nav.appendChild(b);
+      });
+      const signOutBtn = document.createElement('button');
+      signOutBtn.textContent = t('navSignOut');
+      signOutBtn.onclick = async ()=>{ await authSignOut(); goToTab('explore'); };
+      nav.appendChild(signOutBtn);
+    } else {
+      const signInBtn = document.createElement('button');
+      signInBtn.textContent = t('navSignIn');
+      if(currentTab === 'auth') signInBtn.className = 'active';
+      signInBtn.onclick = ()=>goToTab('auth');
+      nav.appendChild(signInBtn);
+    }
   }
 
   function renderHeader(){
     document.getElementById('hTitle').textContent = t('title');
     document.getElementById('hSub').textContent = t('subtitle');
-    document.title = t('title');
+    if(currentTab === 'explore') document.title = t('explore.pageTitle');
+    else if(currentTab === 'release' && releaseViewState.card) document.title = releaseViewState.card.title + t('release.pageTitleSuffix');
+    else if(currentTab === 'profileView' && profileViewState.profile) document.title = (profileViewState.profile.display_name || '?') + t('profile.pageTitleSuffix');
+    else document.title = t('title');
+  }
+
+  // Rendered in place of any Auth-gated view (sign-in form, profile
+  // edit, publish, my releases) whenever IS_FILE_PROTOCOL is true.
+  // Returns true if it rendered the notice (caller should stop), false
+  // otherwise.
+  function renderFileProtocolNoticeIfNeeded(panel){
+    if(!IS_FILE_PROTOCOL) return false;
+    panel.appendChild(el('h2', null, t('security.fileProtocolTitle')));
+    appendMsg(panel, 'warn', t('security.fileProtocolNotice'));
+    return true;
   }
 
   function viewAuth(){
     const panel = el('div', 'panel');
+    if(renderFileProtocolNoticeIfNeeded(panel)){ root.appendChild(panel); return; }
     if(session && session.user){
       panel.appendChild(el('h2', null, t('signIn')));
       const msg = el('div');
@@ -552,13 +1134,11 @@
         try{
           if(mode === 'signin'){
             await authSignIn(email, password);
-            currentTab = 'profile';
-            renderAll();
+            goToTab('explore');
           } else {
             const result = await authSignUp(email, password);
             if(result.confirmed){
-              currentTab = 'profile';
-              renderAll();
+              goToTab('explore');
             } else {
               showMsg(msgBox, 'warn', errMsg('COMMUNITY_EMAIL_CONFIRMATION_REQUIRED'));
               mode = 'signin';
@@ -578,9 +1158,10 @@
 
   function viewProfile(){
     const panel = el('div', 'panel');
+    if(renderFileProtocolNoticeIfNeeded(panel)){ root.appendChild(panel); return; }
     panel.appendChild(el('h2', null, t('profileTitle')));
     if(!session || !session.user){
-      showMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
+      appendMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
       root.appendChild(panel);
       return;
     }
@@ -617,6 +1198,7 @@
       }
       saveBtn.disabled = true;
       try{
+        assertAuthAllowed();
         await restRequest('/profiles', {
           method: 'POST',
           headers: {Prefer: 'resolution=merge-duplicates,return=minimal'},
@@ -646,9 +1228,10 @@
 
   function viewPublish(){
     const panel = el('div', 'panel');
+    if(renderFileProtocolNoticeIfNeeded(panel)){ root.appendChild(panel); return; }
     panel.appendChild(el('h2', null, t('publishTitle')));
     if(!session || !session.user){
-      showMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
+      appendMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
       root.appendChild(panel);
       return;
     }
@@ -749,9 +1332,10 @@
 
   function viewMine(){
     const panel = el('div', 'panel');
+    if(renderFileProtocolNoticeIfNeeded(panel)){ root.appendChild(panel); return; }
     panel.appendChild(el('h2', null, t('mineTitle')));
     if(!session || !session.user){
-      showMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
+      appendMsg(panel, 'warn', errMsg('COMMUNITY_AUTH_REQUIRED'));
       root.appendChild(panel);
       return;
     }
@@ -779,7 +1363,7 @@
 
           const dlBtn = el('button', 'btn secondary', t('download'));
           dlBtn.onclick = ()=>{
-            downloadText((row.title || 'release').replace(/[^a-z0-9_-]+/gi,'_') + '.vrelease', row.snapshot_text);
+            downloadText(releaseFilename(row.title, row.id), row.snapshot_text);
           };
           actions.appendChild(dlBtn);
 
@@ -789,6 +1373,7 @@
               if(!confirm(t('unpublishConfirm'))) return;
               unpubBtn.disabled = true;
               try{
+                assertAuthAllowed();
                 await restRequest('/community_releases?id=eq.' + encodeURIComponent(row.id), {
                   method: 'PATCH',
                   headers: {Prefer: 'return=minimal'},
@@ -814,90 +1399,464 @@
     function viewMineRefresh(){ renderAll(); }
   }
 
-  function viewBrowse(){
+  // ===================================================================
+  // Discovery card (grid) -- the reusable Release card view model (spec
+  // § 6). Shows title/author/description/tags/language/mod count/
+  // published time/generation-remix indicator/parent title. Never shows
+  // the raw UUID prominently. Whole card is one click target (spec § 56)
+  // navigating to the Release detail route; nested interactive elements
+  // (tag pills) stop propagation so clicking a tag filters Explore
+  // instead of also opening the card.
+  // ===================================================================
+  function discoveryCardEl(card){
+    const el_ = el('div', 'release-card');
+    el_.tabIndex = 0;
+    el_.setAttribute('role', 'link');
+    el_.setAttribute('aria-label', card.title);
+
+    const thumb = el('div', 'release-thumb', '🎮'); // spec § 7: no screenshot requirement yet -- clean placeholder only
+    el_.appendChild(thumb);
+
+    el_.appendChild(el('h3', null, card.title));
+    if(card.description) el_.appendChild(el('div', 'desc', card.description));
+
+    const metaLine = el('div', 'meta-line');
+    const bits = [];
+    if(card.author_display_name) bits.push(card.author_display_name);
+    bits.push(t('modCount', {count: card.mod_count}));
+    metaLine.textContent = bits.join(' · ');
+    el_.appendChild(metaLine);
+
+    const provLine = el('div', 'meta-line');
+    provLine.textContent = card.parent_release_id
+      ? t('release.remixOfTitle', {title: card.parent_title || '?'})
+      : (card.generation > 0 ? t('release.remix', {gen: card.generation}) : t('release.original'));
+    el_.appendChild(provLine);
+
+    const bottomRow = el('div', 'row');
+    if(card.language){
+      const badge = el('span', 'lang-badge', languageLabel(card.language));
+      bottomRow.appendChild(badge);
+    }
+    if(Array.isArray(card.tags) && card.tags.length){
+      const tagRow = el('div', 'tag-row');
+      card.tags.slice(0, 4).forEach(tag=>{
+        const pill = el('span', 'tag-pill', tag);
+        pill.onclick = (ev)=>{ ev.stopPropagation(); navigateExplore({tag}); };
+        tagRow.appendChild(pill);
+      });
+      bottomRow.appendChild(tagRow);
+    }
+    el_.appendChild(bottomRow);
+
+    const openCard = ()=>navigateTo({release: card.id});
+    el_.addEventListener('click', openCard);
+    el_.addEventListener('keydown', (ev)=>{ if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); openCard(); } });
+
+    return el_;
+  }
+
+  function languageLabel(lang){
+    if(lang === 'zh-CN') return '简体中文';
+    if(lang === 'en-US') return 'English';
+    return lang;
+  }
+
+  // ===================================================================
+  // Explore (spec § 5/8/10/11/12) -- the Community landing page. Works
+  // fully signed-out. Search box + language/tag filters + a single
+  // deterministic "Latest" list (published_at DESC, no ranking
+  // algorithm) + keyset pagination via a "Load more" button. All filter
+  // state lives in the URL (?q=&lang=&tag=) so the page is shareable and
+  // survives a refresh.
+  // ===================================================================
+  function viewExplore(){
     const panel = el('div', 'panel');
-    panel.appendChild(el('h2', null, t('browseTitle')));
+    panel.appendChild(el('h2', null, t('explore.latest')));
 
-    const idLabel = el('label', 'field-label', t('remoteIdLabel'));
-    const idInput = document.createElement('input'); idInput.type = 'text';
-    panel.appendChild(idLabel); panel.appendChild(idInput);
+    const searchBar = el('div', 'search-bar');
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text'; searchInput.placeholder = t('explore.searchPlaceholder');
+    searchInput.value = exploreState.q || '';
+    searchInput.maxLength = 100;
+    const searchForm = document.createElement('form');
+    searchForm.style.display = 'contents';
+    searchForm.appendChild(searchInput);
+    const searchBtn = el('button', 'btn', t('explore.searchButton'));
+    searchBtn.type = 'submit';
+    searchForm.appendChild(searchBtn);
+    searchForm.addEventListener('submit', (ev)=>{
+      ev.preventDefault();
+      navigateExplore({q: sanitizeQueryText(searchInput.value, 100)});
+    });
+    searchBar.appendChild(searchForm);
+    panel.appendChild(searchBar);
 
-    const row = el('div', 'row'); row.style.marginTop = '10px';
-    const lookupBtn = el('button', 'btn', t('lookupBtn'));
-    row.appendChild(lookupBtn);
-    panel.appendChild(row);
+    const filtersBar = el('div', 'filters-bar');
+    const langSelect = document.createElement('select'); langSelect.className = 'filter';
+    const allOpt = document.createElement('option'); allOpt.value = ''; allOpt.textContent = t('filters.allLanguages');
+    langSelect.appendChild(allOpt);
+    ['zh-CN', 'en-US'].forEach(code=>{
+      const o = document.createElement('option'); o.value = code; o.textContent = languageLabel(code);
+      if(exploreState.language === code) o.selected = true;
+      langSelect.appendChild(o);
+    });
+    langSelect.addEventListener('change', ()=>{ navigateExplore({language: langSelect.value}); });
+    filtersBar.appendChild(langSelect);
 
-    const msgBox = el('div'); panel.appendChild(msgBox);
-    const resultBox = el('div'); panel.appendChild(resultBox);
+    if(exploreState.tag){
+      const chip = el('span', 'chip');
+      const chipText = document.createElement('span'); chipText.textContent = t('filters.tagLabel') + ': ' + exploreState.tag;
+      chip.appendChild(chipText);
+      const clearBtn = document.createElement('button'); clearBtn.textContent = '×'; clearBtn.setAttribute('aria-label', t('filters.clearTag', {tag: exploreState.tag}));
+      clearBtn.onclick = ()=>navigateExplore({tag: ''});
+      chip.appendChild(clearBtn);
+      filtersBar.appendChild(chip);
+    }
+    panel.appendChild(filtersBar);
+
+    const statusBox = el('div'); panel.appendChild(statusBox);
+    const gridBox = el('div', 'card-grid'); panel.appendChild(gridBox);
+    const loadMoreRow = el('div'); panel.appendChild(loadMoreRow);
     root.appendChild(panel);
 
-    lookupBtn.onclick = async ()=>{
-      const id = idInput.value.trim();
-      if(!id) return;
-      clear(resultBox);
-      showMsg(msgBox, 'info', t('loading'));
-      try{
-        const rows = await restRequest('/community_releases?id=eq.' + encodeURIComponent(id) +
-          '&select=id,title,description,author_display_name,language,release_note,generation,parent_release_id,is_published,published_at&is_published=eq.true', {method:'GET'});
-        if(!rows || !rows.length){
-          showMsg(msgBox, 'error', errMsg('COMMUNITY_RELEASE_NOT_FOUND'));
-          return;
-        }
-        showMsg(msgBox, '', '');
-        const release = rows[0];
-
-        const [mods, tags] = await Promise.all([
-          restRequest('/community_release_mods?release_id=eq.' + encodeURIComponent(id) + '&select=position,manifest_id,manifest_name&order=position.asc', {method:'GET'}).catch(()=>[]),
-          restRequest('/community_release_tags?release_id=eq.' + encodeURIComponent(id) + '&select=tag', {method:'GET'}).catch(()=>[])
-        ]);
-
-        const card = el('div', 'card');
-        card.appendChild(el('h3', null, release.title));
-        if(release.description) card.appendChild(el('div', 'meta-line', release.description));
-        if(release.author_display_name) card.appendChild(el('div', 'meta-line', release.author_display_name));
-        card.appendChild(el('div', 'meta-line', t('generationLabel', {gen: release.generation})));
-        if(release.language) card.appendChild(el('div', 'meta-line', t('language') + ': ' + release.language));
-        if(release.release_note) card.appendChild(el('div', 'meta-line', t('releaseNote') + ': ' + release.release_note));
-        if(tags && tags.length) card.appendChild(el('div', 'meta-line', t('tags') + ': ' + tags.map(x=>x.tag).join(', ')));
-        card.appendChild(el('div', 'meta-line', t('mods') + ': ' + mods.map(m=>m.manifest_id).join(', ')));
-        resultBox.appendChild(card);
-
-        // Direct parent
-        const parentBox = el('div', 'panel');
-        parentBox.appendChild(el('h2', null, t('directParent')));
-        if(release.parent_release_id){
-          try{
-            const prows = await restRequest('/community_releases?id=eq.' + encodeURIComponent(release.parent_release_id) +
-              '&select=id,title&is_published=eq.true', {method:'GET'});
-            if(prows && prows.length){
-              parentBox.appendChild(el('div', 'meta-line', prows[0].title + ' (' + prows[0].id + ')'));
-            } else {
-              parentBox.appendChild(el('div', 'meta-line', t('none')));
-            }
-          }catch(e){ parentBox.appendChild(el('div', 'meta-line', t('none'))); }
-        } else {
-          parentBox.appendChild(el('div', 'meta-line', t('none')));
-        }
-        resultBox.appendChild(parentBox);
-
-        // Direct remixes
-        const remixBox = el('div', 'panel');
-        remixBox.appendChild(el('h2', null, t('directRemixes')));
-        try{
-          const crows = await restRequest('/community_releases?parent_release_id=eq.' + encodeURIComponent(id) +
-            '&is_published=eq.true&select=id,title', {method:'GET'});
-          if(crows && crows.length){
-            crows.forEach(c=>remixBox.appendChild(el('div', 'meta-line', c.title + ' (' + c.id + ')')));
-          } else {
-            remixBox.appendChild(el('div', 'meta-line', t('none')));
-          }
-        }catch(e){ remixBox.appendChild(el('div', 'meta-line', t('none'))); }
-        resultBox.appendChild(remixBox);
-
-      }catch(e){
-        showMsg(msgBox, 'error', errMsg(e.code) || e.message);
+    function draw(){
+      clear(gridBox); clear(loadMoreRow); clear(statusBox);
+      if(exploreState.error){
+        const box = el('div');
+        showMsg(box, 'error', exploreState.error);
+        statusBox.appendChild(box);
+        const retryBtn = el('button', 'btn secondary', t('retry'));
+        retryBtn.onclick = ()=>runExploreQuery({reset:true});
+        statusBox.appendChild(retryBtn);
+        return;
       }
-    };
+      if(exploreState.loading && exploreState.rows.length === 0){
+        showMsg(statusBox, 'info', t('explore.loading'));
+        return;
+      }
+      if(!exploreState.loading && exploreState.rows.length === 0){
+        showMsg(statusBox, 'info', t('explore.empty'));
+        return;
+      }
+      exploreState.rows.forEach(card=>gridBox.appendChild(discoveryCardEl(card)));
+      if(exploreState.nextCursor){
+        const moreBtn = el('button', 'btn secondary load-more', exploreState.loading ? t('loading') : t('explore.loadMore'));
+        moreBtn.disabled = exploreState.loading;
+        moreBtn.onclick = ()=>runExploreQuery({reset:false});
+        loadMoreRow.appendChild(moreBtn);
+      }
+    }
+    exploreState.onDraw = draw;
+    draw();
+    // Re-run the query whenever the FILTER KEY (q/language/tag) differs
+    // from the one last executed -- not just "has any query ever run" --
+    // otherwise changing the search box/filters after the first load
+    // would silently keep showing the previous, now-stale result set.
+    const queryKey = JSON.stringify([exploreState.q, exploreState.language, exploreState.tag]);
+    if(exploreState.lastQueryKey !== queryKey) runExploreQuery({reset:true});
+  }
+
+  async function runExploreQuery({reset}){
+    if(reset){ exploreState.rows = []; exploreState.nextCursor = null; }
+    exploreState.lastQueryKey = JSON.stringify([exploreState.q, exploreState.language, exploreState.tag]);
+    exploreState.loading = true; exploreState.error = null;
+    if(exploreState.onDraw) exploreState.onDraw();
+    try{
+      const {rows, nextCursor} = await listReleases({
+        q: exploreState.q, language: exploreState.language, tag: exploreState.tag,
+        cursor: reset ? null : exploreState.nextCursor
+      });
+      exploreState.rows = reset ? rows : exploreState.rows.concat(rows);
+      exploreState.nextCursor = nextCursor;
+    }catch(e){
+      exploreState.error = errMsg(e.code) || e.message;
+    }
+    exploreState.loading = false;
+    if(exploreState.onDraw) exploreState.onDraw();
+  }
+
+  function navigateExplore(patch){
+    const next = {q: exploreState.q, lang: exploreState.language, tag: exploreState.tag};
+    if('q' in patch) next.q = patch.q;
+    if('language' in patch) next.lang = patch.language;
+    if('tag' in patch) next.tag = patch.tag;
+    navigateTo(next);
+  }
+
+  // ===================================================================
+  // Release detail (spec § 14-27) -- fully public. Shows metadata, Mods
+  // (never executed), compatibility, parent/children lineage, download,
+  // Open in Runtime (handoff only, § 25), Remix (same handoff, § 27),
+  // Copy Link.
+  // ===================================================================
+  function viewReleaseDetail(){
+    const panel = el('div', 'panel');
+    root.appendChild(panel);
+
+    function draw(){
+      clear(panel);
+      if(releaseViewState.loading){
+        showMsg(panel, 'info', t('release.loading'));
+        return;
+      }
+      if(releaseViewState.error){
+        showMsg(panel, 'error', releaseViewState.error);
+        const retryBtn = el('button', 'btn secondary', t('retry'));
+        retryBtn.onclick = ()=>loadReleaseView(releaseViewState.id);
+        panel.appendChild(retryBtn);
+        return;
+      }
+      const card = releaseViewState.card;
+      if(!card) return;
+
+      panel.appendChild(el('h2', null, card.title));
+      const byLine = el('div', 'meta-line');
+      if(card.author_display_name){
+        byLine.textContent = t('release.byAuthor', {name: card.author_display_name}) + ' · ';
+      }
+      byLine.appendChild(document.createTextNode(t('release.publishedAt', {date: formatDate(card.published_at)})));
+      panel.appendChild(byLine);
+
+      if(card.creator_id){
+        const authorLink = document.createElement('a');
+        authorLink.href = '?profile=' + encodeURIComponent(card.creator_id);
+        authorLink.className = 'plain-link';
+        authorLink.textContent = card.author_display_name || t('profile.releasesTitle');
+        authorLink.onclick = (ev)=>{ ev.preventDefault(); navigateTo({profile: card.creator_id}); };
+        const authorRow = el('div', 'meta-line');
+        authorRow.appendChild(authorLink);
+        panel.appendChild(authorRow);
+      }
+
+      if(card.description) panel.appendChild(el('p', null, card.description));
+
+      const compat = compatibilityOf(card);
+      panel.appendChild(el('span', 'compat-badge ' + compat.cls, t('release.' + compat.label)));
+
+      const provLine = el('div', 'meta-line');
+      provLine.style.marginTop = '8px';
+      if(card.parent_release_id){
+        if(card.parent_title){
+          const link = document.createElement('a');
+          link.href = '?release=' + encodeURIComponent(card.parent_release_id);
+          link.className = 'plain-link';
+          link.textContent = t('release.remixOfTitle', {title: card.parent_title});
+          link.onclick = (ev)=>{ ev.preventDefault(); navigateTo({release: card.parent_release_id}); };
+          provLine.appendChild(link);
+        } else {
+          provLine.textContent = t('release.parentUnavailable');
+        }
+      } else {
+        provLine.textContent = t('release.original');
+      }
+      if(card.generation > 0){
+        const genNote = el('span', 'small'); genNote.textContent = '  (' + t('release.remix', {gen: card.generation}) + ')';
+        provLine.appendChild(genNote);
+      }
+      panel.appendChild(provLine);
+
+      if(Array.isArray(card.tags) && card.tags.length){
+        const tagRow = el('div', 'tag-row'); tagRow.style.marginTop = '8px';
+        card.tags.forEach(tag=>{
+          const pill = el('span', 'tag-pill', tag);
+          pill.onclick = ()=>navigateTo({tag});
+          tagRow.appendChild(pill);
+        });
+        panel.appendChild(tagRow);
+      }
+      if(card.language){
+        const langLine = el('div', 'meta-line'); langLine.style.marginTop = '6px';
+        langLine.textContent = t('language') + ': ' + languageLabel(card.language);
+        panel.appendChild(langLine);
+      }
+      if(card.release_note){
+        const noteLine = el('div', 'meta-line'); noteLine.textContent = t('releaseNote') + ': ' + card.release_note;
+        panel.appendChild(noteLine);
+      }
+
+      const actions = el('div', 'actions'); actions.style.marginTop = '14px';
+      const dlBtn = el('button', 'btn secondary', t('release.downloadBtn'));
+      dlBtn.onclick = ()=>{
+        if(releaseViewState.snapshotText) downloadText(releaseFilename(card.title, card.id), releaseViewState.snapshotText);
+      };
+      actions.appendChild(dlBtn);
+
+      const openBtn = el('button', 'btn', t('release.openInRuntimeBtn'));
+      openBtn.onclick = ()=>openInRuntime(card.id);
+      actions.appendChild(openBtn);
+
+      const remixBtn = el('button', 'btn secondary', t('release.remixBtn'));
+      remixBtn.onclick = ()=>openInRuntime(card.id);
+      actions.appendChild(remixBtn);
+
+      const copyBtn = el('button', 'btn secondary', t('release.copyLinkBtn'));
+      copyBtn.onclick = async ()=>{
+        const ok = await copyToClipboard(location.href);
+        if(ok) toast(t('release.linkCopied'));
+      };
+      actions.appendChild(copyBtn);
+      panel.appendChild(actions);
+
+      const openHint = el('div', 'small'); openHint.style.marginTop = '6px';
+      openHint.textContent = t('release.openInRuntimeHint');
+      panel.appendChild(openHint);
+
+      // Mods (never executed -- textContent only, read-only)
+      const modsHeading = el('h2', null, t('release.modsTitle', {count: card.mod_count}));
+      modsHeading.style.marginTop = '18px';
+      panel.appendChild(modsHeading);
+      const modsBox = el('div');
+      panel.appendChild(modsBox);
+      let snapshotMods = [];
+      try{ snapshotMods = releaseViewState.snapshotText ? (JSON.parse(releaseViewState.snapshotText).mods || []) : []; }catch(e){ snapshotMods = []; }
+      if(snapshotMods.length){
+        renderModList(modsBox, snapshotMods);
+      }
+
+      // Technical details (collapsible)
+      const details = document.createElement('details'); details.className = 'tech-details';
+      const summary = document.createElement('summary'); summary.textContent = t('release.techDetails');
+      details.appendChild(summary);
+      const techList = el('div');
+      [
+        [t('release.runtimeVersion'), card.runtime_version],
+        [t('release.apiVersion'), card.api_version],
+        [t('release.vmpVersion'), card.vmp_version],
+        [t('release.formatVersion'), card.community_release_format_version]
+      ].forEach(([label, val])=>{
+        if(val === null || val === undefined) return;
+        techList.appendChild(el('div', 'meta-line', label + ': ' + val));
+      });
+      details.appendChild(techList);
+      panel.appendChild(details);
+
+      // Direct remixes
+      const remixHeading = el('h2', null, t('release.remixesTitle') + (card.remix_count ? ' (' + card.remix_count + ')' : ''));
+      remixHeading.style.marginTop = '18px';
+      panel.appendChild(remixHeading);
+      if(releaseViewState.children === null){
+        appendMsg(panel, 'info', t('loading'));
+      } else if(releaseViewState.children.length === 0){
+        appendMsg(panel, 'info', t('release.remixesEmpty'));
+      } else {
+        const childGrid = el('div', 'card-grid');
+        releaseViewState.children.forEach(c=>childGrid.appendChild(discoveryCardEl(c)));
+        panel.appendChild(childGrid);
+      }
+    }
+    releaseViewState.onDraw = draw;
+    draw();
+  }
+
+  async function loadReleaseView(id){
+    releaseViewState.loading = true; releaseViewState.error = null; releaseViewState.card = null; releaseViewState.children = null;
+    if(releaseViewState.onDraw) releaseViewState.onDraw();
+    try{
+      const {card, snapshotText} = await getReleaseDetail(id);
+      releaseViewState.card = card;
+      releaseViewState.snapshotText = snapshotText;
+      releaseViewState.loading = false;
+      if(releaseViewState.onDraw) releaseViewState.onDraw();
+      getChildren(id).then(children=>{
+        releaseViewState.children = children;
+        if(releaseViewState.onDraw) releaseViewState.onDraw();
+      }).catch(()=>{ releaseViewState.children = []; if(releaseViewState.onDraw) releaseViewState.onDraw(); });
+      if(currentTab === 'release') document.title = card.title + t('release.pageTitleSuffix');
+    }catch(e){
+      releaseViewState.loading = false;
+      releaseViewState.error = errMsg(e.code) || e.message;
+      if(releaseViewState.onDraw) releaseViewState.onDraw();
+    }
+  }
+
+  function openInRuntime(releaseId){
+    // Handoff (spec § 25/26): pass ONLY the remote Release id, never a
+    // token. Opens in a new tab so this Portal's own session/tab state
+    // is never touched by the Runtime.
+    const base = COMMUNITY_BACKEND_CONFIG.runtimeBaseUrl;
+    const sep = base.indexOf('?') === -1 ? '?' : '&';
+    const win = window.open(base + sep + 'communityRelease=' + encodeURIComponent(releaseId), '_blank', 'noopener,noreferrer');
+    if(win) win.opener = null;
+  }
+
+  // ===================================================================
+  // Public profile (spec § 17-18/50-51/65/70)
+  // ===================================================================
+  function viewPublicProfile(){
+    const panel = el('div', 'panel');
+    root.appendChild(panel);
+
+    function draw(){
+      clear(panel);
+      if(profileViewState.loading){
+        showMsg(panel, 'info', t('profile.loading'));
+        return;
+      }
+      if(profileViewState.error || !profileViewState.profile){
+        showMsg(panel, 'error', profileViewState.error || t('profile.notFound'));
+        return;
+      }
+      const profile = profileViewState.profile;
+      const header = el('div', 'profile-header');
+      header.appendChild(renderAvatar(profile.display_name, profile.avatar_url, true));
+      const nameCol = el('div');
+      nameCol.appendChild(el('h2', null, profile.display_name || '?'));
+      if(profile.created_at){
+        nameCol.appendChild(el('div', 'small', t('profile.joined', {date: formatDate(profile.created_at)})));
+      }
+      header.appendChild(nameCol);
+      panel.appendChild(header);
+
+      if(profile.bio) panel.appendChild(el('p', null, profile.bio));
+
+      if(session && session.user && session.user.id === profile.user_id){
+        const editBtn = el('button', 'btn secondary', t('profile.editBtn'));
+        editBtn.onclick = ()=>goToTab('profile');
+        panel.appendChild(editBtn);
+      }
+
+      const releasesHeading = el('h2', null, t('profile.releasesTitle'));
+      releasesHeading.style.marginTop = '18px';
+      panel.appendChild(releasesHeading);
+      if(profileViewState.releases === null){
+        appendMsg(panel, 'info', t('loading'));
+      } else if(profileViewState.releases.length === 0){
+        appendMsg(panel, 'info', t('profile.empty'));
+      } else {
+        const grid = el('div', 'card-grid');
+        profileViewState.releases.forEach(c=>grid.appendChild(discoveryCardEl(c)));
+        panel.appendChild(grid);
+      }
+    }
+    profileViewState.onDraw = draw;
+    draw();
+  }
+
+  async function loadProfileView(id){
+    profileViewState.loading = true; profileViewState.error = null; profileViewState.profile = null; profileViewState.releases = null;
+    if(profileViewState.onDraw) profileViewState.onDraw();
+    try{
+      const profile = await getPublicProfile(id);
+      if(!profile){
+        profileViewState.loading = false;
+        profileViewState.error = t('profile.notFound');
+        if(profileViewState.onDraw) profileViewState.onDraw();
+        return;
+      }
+      profileViewState.profile = profile;
+      profileViewState.loading = false;
+      if(profileViewState.onDraw) profileViewState.onDraw();
+      if(currentTab === 'profileView') document.title = (profile.display_name || '?') + t('profile.pageTitleSuffix');
+      listProfileReleases(id).then(releases=>{
+        profileViewState.releases = releases;
+        if(profileViewState.onDraw) profileViewState.onDraw();
+      }).catch(()=>{ profileViewState.releases = []; if(profileViewState.onDraw) profileViewState.onDraw(); });
+    }catch(e){
+      profileViewState.loading = false;
+      profileViewState.error = errMsg(e.code) || e.message;
+      if(profileViewState.onDraw) profileViewState.onDraw();
+    }
   }
 
   function renderAll(){
@@ -914,7 +1873,9 @@
     else if(currentTab === 'profile') viewProfile();
     else if(currentTab === 'publish') viewPublish();
     else if(currentTab === 'mine') viewMine();
-    else if(currentTab === 'browse') viewBrowse();
+    else if(currentTab === 'release') viewReleaseDetail();
+    else if(currentTab === 'profileView') viewPublicProfile();
+    else viewExplore();
   }
 
   document.getElementById('langSelect').addEventListener('change', (ev)=>{
@@ -924,7 +1885,7 @@
 
   loadSession();
   document.getElementById('langSelect').value = locale;
-  if(session && session.user) currentTab = 'profile';
+  parseRoute();
   renderAll();
 
 })();

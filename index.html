@@ -6658,6 +6658,39 @@ const WorkshopController = (() => {
   overlayEl.querySelectorAll('.ws-tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.wsTab)));
   overlayEl.querySelector('#wsCloseBtn').addEventListener('click', close);
 
+  /* Runtime 0.2 Community Discovery handoff (spec § 25/26): the
+     Community Portal's "Open in Runtime"/"Remix" buttons open this
+     Runtime with `?communityRelease=<uuid>` in the URL -- NEVER an Auth
+     token, NEVER Mod source, only the public remote Release id. On
+     load, this Runtime may automatically fetch that Release's public
+     metadata and show the SAME preview/trust-notice card the manual
+     "Open Community Release (remote)" field already produces -- it must
+     NOT automatically execute the included Mods (hard requirement).
+     Opening/activating the Release still requires the player's explicit
+     "Open Release" click, exactly like any other Open Release path. This
+     runs once, fire-and-forget, wrapped in try/catch so a missing/
+     unreachable Community backend can never block ordinary boot -- see
+     COMMUNITY_BACKEND_SPEC.md / COMMUNITY_DISCOVERY_SPEC.md. */
+  (async () => {
+    let remoteId;
+    try {
+      remoteId = new URLSearchParams(location.search).get('communityRelease');
+    } catch(e){ return; }
+    if(!remoteId) return;
+    activeTab = 'export';
+    communityRemoteIdInput = remoteId;
+    communityRemoteFetching = true;
+    open();
+    try {
+      const rel = await runtime.community.getRelease(remoteId);
+      communityPendingImport = rel;
+    } catch(e){
+      communityFeedback = {kind:'error', message: humanizeReleaseError(e)};
+    }
+    communityRemoteFetching = false;
+    render();
+  })();
+
   return { open, close };
 })();
 
