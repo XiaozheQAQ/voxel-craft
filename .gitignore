@@ -1,0 +1,4 @@
+supabase/.temp/
+dist-community/
+dist-play/
+.wrangler/
