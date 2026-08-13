@@ -5089,9 +5089,21 @@ async function communityGetRelease(remoteId){
   let release;
   try { release = JSON.parse(row.snapshot_text); }
   catch(e){ throw regError('COMMUNITY_RELEASE_NOT_FOUND', remoteId); }
-  release.__communityRemoteId = row.id; // informational only, not part of Release Format 1
-  release.__snapshotText = row.snapshot_text; // exact bytes, for Download without re-serializing
-  release.__trustTier = TRUST_COMMUNITY_REMOTE; // this Release entered the Runtime via an anonymous remote fetch -- never same-realm-executable this milestone
+  // Attached as non-enumerable properties (Object.defineProperty, not
+  // plain assignment) so these three runtime-private fields can NEVER
+  // appear in JSON.stringify(release)/Object.keys(release)/for-in output
+  // -- structurally, not merely "no current code path happens to
+  // stringify `release` directly." This matters because
+  // JSON.stringify is exactly how a .vrelease/.vwork/.vgame/publish
+  // payload/baked-HTML embed is produced everywhere else in this
+  // Runtime; a marker that could leak into any of those would be a
+  // real defect, not a cosmetic one. Still fully readable via normal
+  // dot-access (rel.__trustTier, rel.__communityRemoteId,
+  // rel.__snapshotText) -- non-enumerable only hides a property from
+  // enumeration/serialization, it does not make it private.
+  Object.defineProperty(release, '__communityRemoteId', {value: row.id, enumerable: false, configurable: true});
+  Object.defineProperty(release, '__snapshotText', {value: row.snapshot_text, enumerable: false, configurable: true});
+  Object.defineProperty(release, '__trustTier', {value: TRUST_COMMUNITY_REMOTE, enumerable: false, configurable: true});
   return release;
 }
 
